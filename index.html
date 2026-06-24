@@ -27,6 +27,8 @@
   <div class="scanlines pointer-events-none fixed inset-0 z-50"></div>
   <div class="bg-mesh pointer-events-none fixed inset-0 z-0"></div>
 
+  <div id="debug-overlay" class="debug-overlay hidden" aria-hidden="true"></div>
+
   <div id="achievement-toast" class="achievement-toast hidden">
     <span class="text-lg">🏆</span>
     <div>
@@ -63,7 +65,7 @@
           </button>
           <button data-difficulty="nightmare" class="diff-card">
             <span class="diff-card-title">Nightmare</span>
-            <span class="diff-card-desc">40% fake news. Good luck.</span>
+            <span class="diff-card-desc">35% fake news. Maximum pain.</span>
           </button>
         </div>
       </div>
@@ -123,7 +125,7 @@
   <div id="margin-overlay" class="overlay-screen fixed inset-0 z-[99] flex items-center justify-center bg-red-950/80 backdrop-blur-sm hidden">
     <div class="w-full max-w-md px-6 text-center">
       <h2 class="text-4xl font-black neon-red mb-2">MARGIN CALL</h2>
-      <p class="text-gray-300 mb-4">Short losses exceed 75% of portfolio. Cover now or get wiped!</p>
+      <p class="text-gray-300 mb-4">Short losses exceed 60% of portfolio. Cover now or get wiped!</p>
       <div class="h-2 bg-gray-800 rounded-full mb-4 overflow-hidden"><div id="margin-timer-bar" class="h-full bg-red-500" style="width:100%"></div></div>
       <button id="margin-cover-btn" class="btn-primary w-full py-4 font-black rounded-xl">COVER ALL NOW</button>
     </div>
@@ -287,6 +289,7 @@
 
     <!-- Sticky bottom trade zone -->
     <div class="game-trade-zone">
+      <p id="trade-status-hint" class="trade-status-hint hidden" aria-live="polite"></p>
       <div class="trade-size-row">
         <span class="trade-size-title">Size</span>
         <div id="trade-size-chips" class="trade-size-chips"></div>
