@@ -25,8 +25,8 @@
 <body class="bg-gray-950 text-gray-100 font-sans min-h-screen overflow-x-hidden selection:bg-emerald-500/30">
 
   <div class="scanlines pointer-events-none fixed inset-0 z-50"></div>
+  <div class="bg-mesh pointer-events-none fixed inset-0 z-0"></div>
 
-  <!-- Achievement toast -->
   <div id="achievement-toast" class="achievement-toast hidden">
     <span class="text-lg">🏆</span>
     <div>
@@ -37,237 +37,291 @@
   </div>
 
   <!-- Main menu -->
-  <div id="main-menu" class="overlay-screen fixed inset-0 z-[90] flex items-center justify-center bg-black/95 backdrop-blur-sm">
-    <div class="w-full max-w-lg px-6 text-center">
-      <h1 class="text-3xl sm:text-5xl font-black tracking-tight mb-2">
+  <div id="main-menu" class="overlay-screen fixed inset-0 z-[90] flex items-center justify-center bg-black/95 backdrop-blur-sm overflow-y-auto py-8">
+    <div class="w-full max-w-lg px-6 text-center relative z-10">
+      <h1 class="menu-title text-3xl sm:text-5xl font-black tracking-tight mb-2">
         <span class="text-emerald-400">INFINITE</span>
         <span class="text-white"> STOCK </span>
         <span class="text-red-400">CHAOS</span>
       </h1>
-      <p class="text-gray-500 font-mono text-xs uppercase tracking-widest mb-6">Satirical Trading Roguelite</p>
-      <p class="font-mono text-sm text-yellow-400 mb-6">Chaos Points: <span id="menu-chaos-points">0</span></p>
+      <p class="text-gray-500 font-mono text-xs uppercase tracking-widest mb-4">Satirical Trading Roguelite</p>
+      <p class="font-mono text-sm text-yellow-400 mb-2">Chaos Points: <span id="menu-chaos-points">0</span></p>
+      <p class="font-mono text-xs text-gray-500 mb-6">Win Streak: <span id="menu-streak">0</span> · Best: <span id="menu-best-streak">0</span></p>
 
-      <div class="mb-6 text-left">
+      <div id="owned-upgrades-preview" class="flex flex-wrap justify-center gap-1 mb-6 min-h-[24px]"></div>
+
+      <div class="mb-4 text-left">
         <p class="text-xs font-mono text-gray-500 uppercase tracking-wider mb-2">Difficulty</p>
-        <div class="grid grid-cols-3 gap-2" id="difficulty-select">
-          <button data-difficulty="normal" class="diff-btn active">Normal</button>
-          <button data-difficulty="chaos" class="diff-btn">Chaos</button>
-          <button data-difficulty="nightmare" class="diff-btn">Nightmare</button>
+        <div class="space-y-2" id="difficulty-select">
+          <button data-difficulty="normal" class="diff-card active">
+            <span class="diff-card-title">Normal</span>
+            <span class="diff-card-desc">Slower news, fewer fakes. Learn the ropes.</span>
+          </button>
+          <button data-difficulty="chaos" class="diff-card">
+            <span class="diff-card-title">Chaos</span>
+            <span class="diff-card-desc">Faster headlines, bigger swings.</span>
+          </button>
+          <button data-difficulty="nightmare" class="diff-card">
+            <span class="diff-card-title">Nightmare</span>
+            <span class="diff-card-desc">40% fake news. Good luck.</span>
+          </button>
         </div>
       </div>
 
-      <button id="start-game-btn" class="w-full py-4 mb-3 bg-emerald-600 hover:bg-emerald-500 font-black text-lg rounded-xl border border-emerald-400/50 shadow-[0_0_25px_rgba(16,185,129,0.3)] transition-transform active:scale-95">
-        START RUN
-      </button>
-      <button id="open-upgrades-btn" class="w-full py-3 mb-3 bg-gray-800 hover:bg-gray-700 font-bold rounded-xl border border-gray-700 transition-transform active:scale-95">
-        UPGRADES
-      </button>
-      <button id="open-achievements-btn" class="w-full py-3 bg-gray-800 hover:bg-gray-700 font-bold rounded-xl border border-gray-700 transition-transform active:scale-95">
-        ACHIEVEMENTS
-      </button>
+      <label class="setting-row mb-4 cursor-pointer">
+        <span class="text-sm">Daily Chaos (fixed seed)</span>
+        <input type="checkbox" id="daily-seed-toggle" class="setting-toggle" />
+      </label>
+
+      <button id="start-game-btn" class="btn-primary w-full py-4 mb-3 font-black text-lg rounded-xl">START RUN</button>
+      <button id="open-upgrades-btn" class="btn-secondary w-full py-3 mb-3 font-bold rounded-xl">UPGRADES</button>
+      <button id="open-achievements-btn" class="btn-secondary w-full py-3 font-bold rounded-xl">ACHIEVEMENTS</button>
     </div>
   </div>
 
-  <!-- Pause overlay -->
+  <!-- Intermission -->
+  <div id="intermission-overlay" class="overlay-screen fixed inset-0 z-[98] flex items-center justify-center bg-black/90 backdrop-blur-md hidden overflow-y-auto py-6">
+    <div class="w-full max-w-lg px-6">
+      <p class="text-center font-mono text-xs text-gray-500 uppercase tracking-widest mb-1">Trading Day Complete</p>
+      <h2 class="text-3xl font-black text-center mb-1 text-emerald-400">WAVE <span id="inter-wave-num">1</span> CLEARED</h2>
+      <p id="inter-goal-result" class="text-center font-mono text-sm mb-6"></p>
+
+      <div class="score-card rounded-xl p-4 mb-4 border border-gray-700 bg-gray-900/80">
+        <div class="grid grid-cols-2 gap-3 text-left font-mono text-sm">
+          <div><span class="text-gray-500 text-xs">Portfolio</span><p id="inter-portfolio" class="font-bold text-emerald-400"></p></div>
+          <div><span class="text-gray-500 text-xs">Peak</span><p id="inter-peak" class="font-bold"></p></div>
+          <div><span class="text-gray-500 text-xs">Wave Trades</span><p id="inter-trades"></p></div>
+          <div><span class="text-gray-500 text-xs">Goals Hit</span><p id="inter-goals"></p></div>
+        </div>
+      </div>
+
+      <p class="text-xs font-mono text-gray-500 uppercase mb-2">Next Wave Goal</p>
+      <p id="inter-next-goal" class="text-sm font-semibold text-yellow-300 mb-4 p-3 rounded-lg bg-yellow-950/30 border border-yellow-800/40"></p>
+
+      <div id="wave-shop" class="mb-4 rounded-xl border border-purple-800/50 bg-purple-950/20 p-4">
+        <p class="font-mono text-xs text-purple-400 uppercase mb-3">Mid-Run Shop <span class="text-gray-500">(spend CP)</span></p>
+        <div id="wave-shop-items" class="space-y-2"></div>
+      </div>
+
+      <button id="keep-trading-btn" class="btn-primary w-full py-4 mb-2 font-black rounded-xl">KEEP TRADING →</button>
+      <button id="cash-out-btn" class="w-full py-4 font-black rounded-xl bg-cyan-700 hover:bg-cyan-600 border border-cyan-400/40 shadow-[0_0_20px_rgba(34,211,238,0.2)]">CASH OUT 💰</button>
+    </div>
+  </div>
+
+  <!-- Retire early -->
+  <div id="retire-overlay" class="overlay-screen fixed inset-0 z-[99] flex items-center justify-center bg-black/85 backdrop-blur-sm hidden">
+    <div class="w-full max-w-md px-6 text-center score-card rounded-2xl p-6 border border-emerald-500/40">
+      <h2 class="text-2xl font-black neon-green mb-2">RETIRE EARLY?</h2>
+      <p id="retire-milestone-text" class="text-gray-300 mb-2"></p>
+      <p class="font-mono text-yellow-400 text-lg mb-6">Bonus: +<span id="retire-bonus">0</span> CP</p>
+      <button id="retire-yes-btn" class="btn-primary w-full py-3 mb-2 font-bold rounded-xl">RETIRE AS LEGEND</button>
+      <button id="retire-no-btn" class="btn-secondary w-full py-3 font-bold rounded-xl">KEEP TRADING</button>
+    </div>
+  </div>
+
+  <!-- Margin call -->
+  <div id="margin-overlay" class="overlay-screen fixed inset-0 z-[99] flex items-center justify-center bg-red-950/80 backdrop-blur-sm hidden">
+    <div class="w-full max-w-md px-6 text-center">
+      <h2 class="text-4xl font-black neon-red mb-2">MARGIN CALL</h2>
+      <p class="text-gray-300 mb-4">Short losses exceed 75% of portfolio. Cover now or get wiped!</p>
+      <div class="h-2 bg-gray-800 rounded-full mb-4 overflow-hidden"><div id="margin-timer-bar" class="h-full bg-red-500" style="width:100%"></div></div>
+      <button id="margin-cover-btn" class="btn-primary w-full py-4 font-black rounded-xl">COVER ALL NOW</button>
+    </div>
+  </div>
+
+  <!-- SEC Raid -->
+  <div id="sec-overlay" class="fixed inset-0 z-[88] flex items-center justify-center bg-blue-950/70 backdrop-blur-sm hidden pointer-events-none">
+    <div class="text-center pointer-events-auto px-6">
+      <h2 class="text-3xl font-black text-blue-400 mb-2 tracking-widest">SEC RAID</h2>
+      <p class="text-gray-300 mb-2">Trading frozen! Answer correctly or pay a fine.</p>
+      <p id="sec-countdown" class="font-mono text-4xl font-bold text-white">5</p>
+    </div>
+  </div>
+
+  <!-- Pause -->
   <div id="pause-overlay" class="overlay-screen fixed inset-0 z-[95] flex items-center justify-center bg-black/85 backdrop-blur-sm hidden">
     <div class="w-full max-w-md px-6">
       <h2 class="text-3xl font-black text-center mb-6 tracking-widest">PAUSED</h2>
       <div class="space-y-4 mb-6">
-        <label class="setting-row">
-          <span>Sound Effects</span>
-          <input type="checkbox" id="setting-sound" checked class="setting-toggle" />
-        </label>
-        <label class="setting-row">
-          <span>Reduced Motion</span>
-          <input type="checkbox" id="setting-reduced-motion" class="setting-toggle" />
-        </label>
-        <label class="setting-row">
-          <span>Particle Effects</span>
-          <input type="checkbox" id="setting-particles" checked class="setting-toggle" />
-        </label>
+        <label class="setting-row"><span>Sound Effects</span><input type="checkbox" id="setting-sound" checked class="setting-toggle" /></label>
+        <label class="setting-row"><span>Reduced Motion</span><input type="checkbox" id="setting-reduced-motion" class="setting-toggle" /></label>
+        <label class="setting-row"><span>Particle Effects</span><input type="checkbox" id="setting-particles" checked class="setting-toggle" /></label>
       </div>
-      <button id="resume-btn" class="w-full py-3 mb-2 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl">RESUME</button>
+      <button id="resume-btn" class="btn-primary w-full py-3 mb-2 font-bold rounded-xl">RESUME</button>
       <button id="end-run-btn" class="w-full py-3 bg-red-900/60 hover:bg-red-800/60 font-bold rounded-xl border border-red-800">END RUN</button>
     </div>
   </div>
 
-  <!-- QTE overlay -->
-  <div id="qte-overlay" class="fixed inset-x-0 top-1/3 z-[85] flex justify-center pointer-events-none hidden">
+  <!-- QTE -->
+  <div id="qte-overlay" class="fixed inset-x-0 top-1/4 z-[85] flex justify-center pointer-events-none hidden">
     <div class="qte-panel pointer-events-auto mx-4 w-full max-w-md rounded-xl border-2 border-yellow-400/60 bg-gray-900/95 p-4 text-center shadow-[0_0_40px_rgba(250,204,21,0.3)]">
       <p id="qte-prompt" class="font-black text-lg sm:text-xl mb-3 text-yellow-300">PANIC SELL?</p>
-      <div class="flex gap-3 justify-center">
-        <button id="qte-yes" class="qte-btn bg-red-600 hover:bg-red-500 px-6 py-3 rounded-lg font-bold">Y — PANIC</button>
-        <button id="qte-no" class="qte-btn bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-lg font-bold">N — HODL</button>
+      <div class="flex gap-3 justify-center flex-wrap">
+        <button id="qte-yes" class="qte-btn bg-red-600 hover:bg-red-500 px-5 py-3 rounded-lg font-bold">Y — PANIC</button>
+        <button id="qte-no" class="qte-btn bg-emerald-600 hover:bg-emerald-500 px-5 py-3 rounded-lg font-bold">N — HODL</button>
       </div>
-      <div class="mt-3 h-1.5 bg-gray-800 rounded-full overflow-hidden">
-        <div id="qte-timer-bar" class="h-full bg-yellow-400 transition-none" style="width:100%"></div>
-      </div>
+      <div class="mt-3 h-1.5 bg-gray-800 rounded-full overflow-hidden"><div id="qte-timer-bar" class="h-full bg-yellow-400" style="width:100%"></div></div>
     </div>
   </div>
 
   <!-- Score screen -->
   <div id="score-overlay" class="overlay-screen fixed inset-0 z-[100] flex items-center justify-center bg-black/92 backdrop-blur-sm hidden overflow-y-auto py-6">
-    <div class="w-full max-w-lg px-6 text-center">
-      <h2 id="score-title" class="text-4xl sm:text-6xl font-black tracking-widest mb-2 neon-red">BANKRUPT</h2>
-      <p id="score-subtitle" class="text-gray-400 font-mono text-sm mb-6">Run complete</p>
+    <div class="w-full max-w-lg px-6">
+      <div class="score-card rounded-2xl p-6 border border-gray-700 bg-gray-900/90 text-center">
+        <h2 id="score-title" class="text-4xl sm:text-5xl font-black tracking-widest mb-2 neon-red">BANKRUPT</h2>
+        <p id="score-subtitle" class="text-gray-400 font-mono text-sm mb-6">Run complete</p>
 
-      <div class="grid grid-cols-2 gap-3 mb-6 text-left">
-        <div class="stat-card rounded-lg p-3 border border-gray-800 bg-gray-900/80">
-          <p class="text-[10px] text-gray-500 font-mono uppercase">Peak Portfolio</p>
-          <p id="score-peak" class="font-mono font-bold text-emerald-400">$0</p>
+        <div class="grid grid-cols-2 gap-3 mb-4 text-left">
+          <div class="mini-stat"><p class="label">Waves Cleared</p><p id="score-waves" class="value">0</p></div>
+          <div class="mini-stat"><p class="label">Goals Hit</p><p id="score-goals" class="value">0</p></div>
+          <div class="mini-stat"><p class="label">Peak Portfolio</p><p id="score-peak" class="value text-emerald-400">$0</p></div>
+          <div class="mini-stat"><p class="label">Trades</p><p id="score-trades" class="value">0</p></div>
+          <div class="mini-stat"><p class="label">News Survived</p><p id="score-news" class="value">0</p></div>
+          <div class="mini-stat"><p class="label">QTE Wins</p><p id="score-qte" class="value">0</p></div>
         </div>
-        <div class="stat-card rounded-lg p-3 border border-gray-800 bg-gray-900/80">
-          <p class="text-[10px] text-gray-500 font-mono uppercase">Trades Made</p>
-          <p id="score-trades" class="font-mono font-bold">0</p>
-        </div>
-        <div class="stat-card rounded-lg p-3 border border-gray-800 bg-gray-900/80">
-          <p class="text-[10px] text-gray-500 font-mono uppercase">News Survived</p>
-          <p id="score-news" class="font-mono font-bold">0</p>
-        </div>
-        <div class="stat-card rounded-lg p-3 border border-gray-800 bg-gray-900/80">
-          <p class="text-[10px] text-gray-500 font-mono uppercase">QTE Wins</p>
-          <p id="score-qte" class="font-mono font-bold">0</p>
-        </div>
+
+        <p class="font-mono text-2xl text-yellow-400 mb-1">+<span id="score-chaos-earned">0</span> Chaos Points</p>
+        <p id="score-streak-bonus" class="text-xs text-gray-500 font-mono mb-6"></p>
+
+        <button id="score-upgrades-btn" class="btn-secondary w-full py-3 mb-2 font-bold rounded-xl">SPEND CHAOS POINTS</button>
+        <button id="score-restart-btn" class="btn-primary w-full py-3 mb-2 font-bold rounded-xl">NEW RUN</button>
+        <button id="score-menu-btn" class="btn-secondary w-full py-3 font-bold rounded-xl">MAIN MENU</button>
       </div>
-
-      <p class="font-mono text-2xl text-yellow-400 mb-6">+<span id="score-chaos-earned">0</span> Chaos Points</p>
-
-      <button id="score-upgrades-btn" class="w-full py-3 mb-2 bg-purple-700 hover:bg-purple-600 font-bold rounded-xl">SPEND CHAOS POINTS</button>
-      <button id="score-restart-btn" class="w-full py-3 mb-2 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl">NEW RUN</button>
-      <button id="score-menu-btn" class="w-full py-3 bg-gray-800 hover:bg-gray-700 font-bold rounded-xl">MAIN MENU</button>
     </div>
   </div>
 
-  <!-- Upgrades modal -->
+  <!-- Modals -->
   <div id="upgrades-overlay" class="overlay-screen fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm hidden overflow-y-auto py-6">
     <div class="w-full max-w-lg px-6">
       <h2 class="text-2xl font-black text-center mb-2">CHAOS UPGRADES</h2>
-      <p class="text-center font-mono text-yellow-400 mb-6">Points: <span id="upgrade-chaos-points">0</span></p>
-      <div id="upgrades-list" class="space-y-3 mb-6"></div>
-      <button id="close-upgrades-btn" class="w-full py-3 bg-gray-800 hover:bg-gray-700 font-bold rounded-xl">CLOSE</button>
+      <p class="text-center font-mono text-yellow-400 mb-2">Points: <span id="upgrade-chaos-points">0</span></p>
+      <p class="text-center text-xs text-gray-500 mb-4"><span id="upgrades-owned-count">0</span> / <span id="upgrades-total-count">0</span> owned</p>
+      <div id="upgrades-list" class="space-y-3 mb-6 max-h-[55vh] overflow-y-auto"></div>
+      <button id="close-upgrades-btn" class="btn-secondary w-full py-3 font-bold rounded-xl">CLOSE</button>
     </div>
   </div>
 
-  <!-- Achievements modal -->
   <div id="achievements-overlay" class="overlay-screen fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-sm hidden overflow-y-auto py-6">
     <div class="w-full max-w-lg px-6">
-      <h2 class="text-2xl font-black text-center mb-6">ACHIEVEMENTS</h2>
+      <h2 class="text-2xl font-black text-center mb-2">ACHIEVEMENTS</h2>
+      <p class="text-center text-xs text-gray-500 mb-4"><span id="achievements-unlocked-count">0</span> / <span id="achievements-total-count">0</span></p>
       <div id="achievements-list" class="space-y-2 mb-6 max-h-[60vh] overflow-y-auto"></div>
-      <button id="close-achievements-btn" class="w-full py-3 bg-gray-800 hover:bg-gray-700 font-bold rounded-xl">CLOSE</button>
+      <button id="close-achievements-btn" class="btn-secondary w-full py-3 font-bold rounded-xl">CLOSE</button>
     </div>
   </div>
 
   <!-- Game UI -->
-  <div id="game-ui" class="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex flex-col min-h-screen gap-3 sm:gap-4 hidden">
+  <div id="game-ui" class="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex flex-col min-h-screen gap-3 sm:gap-4 hidden relative z-10">
 
     <header class="flex items-center justify-between gap-2">
       <div class="min-w-0">
-        <h1 class="text-lg sm:text-2xl font-black tracking-tight truncate">
-          <span class="text-emerald-400">INFINITE</span>
-          <span class="text-white"> STOCK </span>
-          <span class="text-red-400">CHAOS</span>
-        </h1>
-        <div class="flex flex-wrap gap-2 mt-1">
+        <div class="flex flex-wrap items-center gap-2">
+          <span id="wave-badge" class="badge badge-wave">DAY 1/5</span>
           <span id="difficulty-badge" class="badge badge-normal">NORMAL</span>
           <span id="chaos-points-badge" class="badge badge-chaos">0 CP</span>
         </div>
+        <div class="mt-2 flex items-center gap-2">
+          <div class="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden max-w-[140px]">
+            <div id="wave-timer-bar" class="h-full bg-emerald-500 transition-none" style="width:100%"></div>
+          </div>
+          <span id="wave-timer-text" class="font-mono text-[10px] text-gray-500">90s</span>
+        </div>
       </div>
       <div class="flex items-center gap-2 flex-shrink-0">
-        <button id="mute-btn" class="icon-btn" title="Toggle sound" aria-label="Toggle sound">🔊</button>
-        <button id="pause-btn" class="icon-btn" title="Pause" aria-label="Pause">⏸</button>
+        <button id="mute-btn" class="icon-btn" aria-label="Toggle sound">🔊</button>
+        <button id="pause-btn" class="icon-btn" aria-label="Pause">⏸</button>
         <div class="text-right">
-          <p class="text-[10px] sm:text-xs text-gray-500 font-mono uppercase tracking-wider">Stock Price</p>
-          <p id="stock-price" class="font-mono text-xl sm:text-3xl font-bold text-white">$100.00</p>
+          <p class="text-[10px] text-gray-500 font-mono uppercase">Price</p>
+          <p id="stock-price" class="font-mono text-xl sm:text-2xl font-bold text-white">$100.00</p>
         </div>
       </div>
     </header>
 
+    <div id="wave-goal-banner" class="glass-card rounded-lg px-3 py-2 border border-yellow-500/30 bg-yellow-950/20">
+      <p class="text-[10px] font-mono text-yellow-600 uppercase">Wave Goal</p>
+      <p id="wave-goal-text" class="text-xs sm:text-sm font-semibold text-yellow-200">Survive the chaos</p>
+    </div>
+
     <section class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-      <div class="stat-card col-span-2 sm:col-span-1 rounded-xl p-3 sm:p-4 border border-gray-800 bg-gray-900/80">
+      <div class="glass-card portfolio-hero col-span-2 sm:col-span-1 rounded-xl p-3 sm:p-5 border-2 border-emerald-500/30">
         <p class="text-[10px] sm:text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">Portfolio Value</p>
-        <p id="portfolio-value" class="font-mono text-2xl sm:text-4xl font-black neon-green transition-colors duration-300">$1,000.00</p>
+        <p id="portfolio-value" class="font-mono text-3xl sm:text-5xl font-black neon-green leading-none">$1,000.00</p>
       </div>
-      <div class="stat-card rounded-xl p-3 sm:p-4 border border-gray-800 bg-gray-900/80">
-        <p class="text-[10px] sm:text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">Liquid Cash</p>
+      <div class="glass-card rounded-xl p-3 sm:p-4 border border-gray-700/80">
+        <p class="text-[10px] text-gray-500 font-mono uppercase mb-1">Cash</p>
         <p id="liquid-cash" class="font-mono text-lg sm:text-xl font-bold text-cyan-400">$1,000.00</p>
       </div>
-      <div class="stat-card rounded-xl p-3 sm:p-4 border border-gray-800 bg-gray-900/80">
-        <p class="text-[10px] sm:text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">Long Shares</p>
+      <div class="glass-card rounded-xl p-3 sm:p-4 border border-gray-700/80">
+        <p class="text-[10px] text-gray-500 font-mono uppercase mb-1">Long</p>
         <p id="total-shares" class="font-mono text-lg sm:text-xl font-bold text-purple-400">0</p>
       </div>
-      <div class="stat-card rounded-xl p-3 sm:p-4 border border-gray-800 bg-gray-900/80">
-        <p class="text-[10px] sm:text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">Short Position</p>
+      <div class="glass-card rounded-xl p-3 sm:p-4 border border-gray-700/80">
+        <p class="text-[10px] text-gray-500 font-mono uppercase mb-1">Short</p>
         <p id="short-shares" class="font-mono text-lg sm:text-xl font-bold text-orange-400">0</p>
         <p id="short-pnl" class="font-mono text-[10px] text-gray-500"></p>
       </div>
     </section>
 
-    <div id="news-banner" class="news-banner relative overflow-hidden rounded-lg border border-yellow-500/40 bg-yellow-950/40 px-3 py-2 sm:py-3">
+    <div id="news-banner" class="news-banner news-crash relative overflow-hidden rounded-lg px-3 py-2 sm:py-3">
       <div class="flex items-center gap-2 sm:gap-3">
-        <span class="flex-shrink-0 text-[10px] sm:text-xs font-black bg-red-600 text-white px-2 py-0.5 rounded animate-blink uppercase tracking-widest">BREAKING</span>
+        <span class="news-breaking flex-shrink-0 text-[10px] font-black bg-red-600 text-white px-2 py-0.5 rounded uppercase">BREAKING</span>
         <span id="credibility-badge" class="flex-shrink-0 text-[10px] font-black px-2 py-0.5 rounded uppercase credibility-high">HIGH</span>
-        <p id="news-text" class="text-xs sm:text-sm font-semibold text-yellow-300 truncate">Markets open. Brace for chaos...</p>
+        <div class="marquee-wrap flex-1 min-w-0 overflow-hidden">
+          <p id="news-text" class="marquee-text text-xs sm:text-sm font-semibold whitespace-nowrap">Markets open. Brace for chaos...</p>
+        </div>
       </div>
+      <p id="next-news-hint" class="text-[10px] font-mono text-gray-500 mt-1 hidden"></p>
       <p id="fake-news-stamp" class="fake-stamp hidden">FAKE NEWS</p>
     </div>
 
-    <section class="flex-1 min-h-[180px] sm:min-h-[240px]">
-      <div id="chart-container" class="relative w-full h-[180px] sm:h-[240px] rounded-xl border border-gray-800 bg-black/60 overflow-hidden chart-glow">
-        <canvas id="stock-chart" class="block w-full h-full"></canvas>
+    <section>
+      <div id="chart-container" class="chart-container relative w-full min-h-[200px] sm:min-h-[260px] h-[200px] sm:h-[260px] rounded-xl border border-gray-700/80 overflow-hidden">
+        <div class="chart-grid-bg absolute inset-0"></div>
+        <canvas id="stock-chart" class="chart-canvas block w-full h-full relative z-[1]"></canvas>
         <canvas id="particle-canvas" class="particle-canvas"></canvas>
-        <div id="trend-badge" class="absolute top-2 right-2 sm:top-3 sm:right-3 font-mono text-[10px] sm:text-xs px-2 py-1 rounded border border-gray-700 bg-gray-900/80 text-emerald-400">
-          ▲ BULLISH
-        </div>
+        <div id="chart-error" class="chart-error hidden">Chart failed to load. Refresh the page.</div>
+        <div id="trend-badge" class="absolute top-2 right-2 font-mono text-[10px] px-2 py-1 rounded border border-emerald-700/50 bg-gray-900/90 text-emerald-400 z-10">▲ BULLISH</div>
+        <div id="vibe-arrow" class="absolute bottom-2 right-2 text-2xl z-10 hidden">↗️</div>
       </div>
-      <div class="mt-2 rounded-lg border border-gray-800 bg-black/40 p-1">
-        <p class="text-[10px] text-gray-500 font-mono uppercase px-2 pt-1">Portfolio</p>
-        <canvas id="sparkline-chart" class="block w-full h-12 sm:h-16"></canvas>
+      <div class="mt-2 glass-card rounded-lg border border-gray-800 p-1">
+        <div class="flex justify-between items-center px-2 pt-1">
+          <p class="text-[10px] text-gray-500 font-mono uppercase">Portfolio</p>
+          <span id="spark-trend" class="text-[10px] font-mono text-gray-500"></span>
+        </div>
+        <canvas id="sparkline-chart" class="block w-full h-12 sm:h-14"></canvas>
       </div>
     </section>
 
-    <!-- Trade sizing -->
-    <div class="rounded-xl border border-gray-800 bg-gray-900/60 p-3 sm:p-4">
+    <div id="trading-frozen" class="hidden text-center py-1 text-xs font-mono text-red-400 animate-pulse">⛔ TRADING FROZEN — SEC RAID</div>
+
+    <div class="glass-card rounded-xl border border-gray-700/80 p-3 sm:p-4">
       <div class="flex items-center justify-between mb-2">
-        <p class="text-xs font-mono text-gray-500 uppercase tracking-wider">Trade Size</p>
+        <p class="text-xs font-mono text-gray-500 uppercase">Trade Size</p>
         <p id="trade-size-label" class="font-mono font-bold text-emerald-400">100%</p>
       </div>
       <input type="range" id="trade-size-slider" min="0" max="3" value="3" step="1" class="trade-slider w-full" />
-      <div class="flex justify-between text-[10px] font-mono text-gray-600 mt-1">
+      <div id="trade-size-marks" class="flex justify-between text-[10px] font-mono text-gray-600 mt-1">
         <span>25%</span><span>50%</span><span>75%</span><span>100%</span>
       </div>
     </div>
 
     <section class="grid grid-cols-2 gap-2 sm:gap-3">
-      <div class="relative">
-        <button id="buy-btn" class="trade-btn w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-lg bg-emerald-600 hover:bg-emerald-500 text-white border-2 border-emerald-400/50 shadow-[0_0_25px_rgba(16,185,129,0.3)]">
-          BUY <span class="text-xs font-normal opacity-80">(Long)</span>
-        </button>
-      </div>
-      <div class="relative">
-        <button id="sell-btn" class="trade-btn w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-lg bg-red-600 hover:bg-red-500 text-white border-2 border-red-400/50 shadow-[0_0_25px_rgba(239,68,68,0.3)]">
-          SELL <span class="text-xs font-normal opacity-80">(Cash Out)</span>
-        </button>
-      </div>
-      <div class="relative">
-        <button id="short-btn" class="trade-btn w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-lg bg-orange-600 hover:bg-orange-500 text-white border-2 border-orange-400/50 shadow-[0_0_25px_rgba(234,88,12,0.3)]">
-          SHORT <span class="text-xs font-normal opacity-80">(Bet Down)</span>
-        </button>
-      </div>
-      <div class="relative">
-        <button id="cover-btn" class="trade-btn w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-lg bg-blue-600 hover:bg-blue-500 text-white border-2 border-blue-400/50 shadow-[0_0_25px_rgba(59,130,246,0.3)]">
-          COVER <span class="text-xs font-normal opacity-80">(Close Short)</span>
-        </button>
-      </div>
+      <div class="relative"><button id="buy-btn" class="trade-btn trade-buy w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-base">📈 BUY</button></div>
+      <div class="relative"><button id="sell-btn" class="trade-btn trade-sell w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-base">📉 SELL</button></div>
+      <div class="relative"><button id="short-btn" class="trade-btn trade-short w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-base">🔻 SHORT</button></div>
+      <div class="relative"><button id="cover-btn" class="trade-btn trade-cover w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-base">🔼 COVER</button></div>
     </section>
 
-    <!-- Trade log -->
-    <details id="trade-log-panel" class="rounded-xl border border-gray-800 bg-gray-900/60 overflow-hidden">
+    <div class="flex gap-2">
+      <button id="undo-btn" class="btn-secondary flex-1 py-2 text-xs font-mono rounded-lg hidden">↩ UNDO LAST TRADE</button>
+    </div>
+
+    <details class="glass-card rounded-xl border border-gray-800 overflow-hidden">
       <summary class="px-4 py-3 cursor-pointer font-mono text-xs uppercase tracking-wider text-gray-400 hover:text-gray-200 select-none">
         Trade Log <span id="trade-log-count" class="text-gray-600">(0)</span>
       </summary>
-      <div id="trade-log" class="max-h-36 overflow-y-auto px-4 pb-3 space-y-1 font-mono text-[11px] sm:text-xs"></div>
+      <div id="trade-log" class="max-h-32 overflow-y-auto px-4 pb-3 space-y-1 font-mono text-[11px]"></div>
     </details>
-
   </div>
 
   <script src="script.js"></script>
