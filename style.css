@@ -15,7 +15,14 @@ body {
   );
 }
 
-/* ── Neon glow utilities ── */
+body.reduced-motion .shake,
+body.reduced-motion .news-banner.flash,
+body.reduced-motion .animate-blink,
+body.reduced-motion .animate-pulse-slow {
+  animation: none !important;
+}
+
+/* ── Neon glow ── */
 .neon-green {
   color: #34d399;
   text-shadow: 0 0 8px rgba(52, 211, 153, 0.6), 0 0 20px rgba(52, 211, 153, 0.3);
@@ -34,9 +41,60 @@ body {
   box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(16, 185, 129, 0.05);
 }
 
-/* ── News banner flash ── */
+.particle-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ── Badges ── */
+.badge {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-normal { background: #1f2937; color: #9ca3af; border: 1px solid #374151; }
+.badge-chaos { background: #422006; color: #fbbf24; border: 1px solid #92400e; }
+.badge-chaos-mode { background: #450a0a; color: #f87171; border: 1px solid #991b1b; }
+.badge-nightmare { background: #3b0764; color: #e879f9; border: 1px solid #86198f; }
+
+/* ── Credibility ── */
+.credibility-high { background: #065f46; color: #6ee7b7; }
+.credibility-medium { background: #78350f; color: #fcd34d; }
+.credibility-fake { background: #7f1d1d; color: #fca5a5; }
+
+.fake-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg);
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ef4444;
+  border: 4px solid #ef4444;
+  padding: 4px 16px;
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+  animation: stamp-in 0.3s ease-out;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@keyframes stamp-in {
+  0% { transform: translate(-50%, -50%) rotate(-12deg) scale(2); opacity: 0; }
+  100% { transform: translate(-50%, -50%) rotate(-12deg) scale(1); opacity: 1; }
+}
+
+/* ── News flash ── */
 .news-banner {
   transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  position: relative;
 }
 
 .news-banner.flash {
@@ -61,11 +119,9 @@ body {
   50% { opacity: 0.4; }
 }
 
-.animate-blink {
-  animation: blink 1s ease-in-out infinite;
-}
+.animate-blink { animation: blink 1s ease-in-out infinite; }
 
-/* ── Crash shake on chart ── */
+/* ── Shake ── */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   10% { transform: translateX(-4px) translateY(1px); }
@@ -78,18 +134,11 @@ body {
   80% { transform: translateX(1px); }
 }
 
-.shake {
-  animation: shake 0.4s ease-in-out;
-}
+.shake { animation: shake 0.4s ease-in-out; }
 
-/* ── Trade button click juice ── */
-.trade-btn:active {
-  transform: scale(0.93);
-}
-
-.trade-btn.clicked {
-  animation: btn-pop 0.25s ease-out;
-}
+/* ── Trade buttons ── */
+.trade-btn:active { transform: scale(0.93); }
+.trade-btn.clicked { animation: btn-pop 0.25s ease-out; }
 
 @keyframes btn-pop {
   0% { transform: scale(1); }
@@ -98,7 +147,13 @@ body {
   100% { transform: scale(1); }
 }
 
-/* ── Floating trade text ── */
+.trade-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* ── Float text ── */
 .float-text {
   position: absolute;
   left: 50%;
@@ -106,47 +161,201 @@ body {
   transform: translateX(-50%);
   font-family: 'Roboto Mono', 'Courier New', monospace;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1rem;
   pointer-events: none;
   z-index: 20;
   animation: float-up 1.2s ease-out forwards;
   white-space: nowrap;
 }
 
-.float-text.positive {
-  color: #34d399;
-  text-shadow: 0 0 10px rgba(52, 211, 153, 0.7);
-}
-
-.float-text.negative {
-  color: #f87171;
-  text-shadow: 0 0 10px rgba(248, 113, 113, 0.7);
-}
+.float-text.positive { color: #34d399; text-shadow: 0 0 10px rgba(52, 211, 153, 0.7); }
+.float-text.negative { color: #f87171; text-shadow: 0 0 10px rgba(248, 113, 113, 0.7); }
 
 @keyframes float-up {
-  0% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-60px) scale(1.2);
-  }
+  0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-60px) scale(1.2); }
 }
 
-/* ── Bankrupt pulse ── */
+/* ── Trade slider ── */
+.trade-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #059669, #10b981);
+  outline: none;
+}
+
+.trade-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #34d399;
+  border: 2px solid #fff;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.6);
+  cursor: pointer;
+}
+
+.trade-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #34d399;
+  border: 2px solid #fff;
+  cursor: pointer;
+}
+
+/* ── Icon buttons ── */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.icon-btn:hover { background: #374151; }
+.icon-btn:active { transform: scale(0.9); }
+
+/* ── Difficulty buttons ── */
+.diff-btn {
+  padding: 10px 8px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  color: #9ca3af;
+  transition: all 0.15s;
+}
+
+.diff-btn:hover { background: #374151; color: #fff; }
+
+.diff-btn.active {
+  background: #065f46;
+  border-color: #34d399;
+  color: #34d399;
+  box-shadow: 0 0 15px rgba(52, 211, 153, 0.3);
+}
+
+/* ── Settings ── */
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #111827;
+  border-radius: 8px;
+  border: 1px solid #1f2937;
+  cursor: pointer;
+}
+
+.setting-toggle {
+  width: 44px;
+  height: 24px;
+  accent-color: #34d399;
+  cursor: pointer;
+}
+
+/* ── QTE ── */
+.qte-btn {
+  transition: transform 0.1s;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.qte-btn:active { transform: scale(0.93); }
+
+/* ── Achievement toast ── */
+.achievement-toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #1f2937;
+  border: 1px solid #fbbf24;
+  border-radius: 12px;
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.3);
+  animation: toast-in 0.4s ease-out;
+  max-width: 300px;
+}
+
+@keyframes toast-in {
+  0% { transform: translateX(120%); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+/* ── Upgrade cards ── */
+.upgrade-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #111827;
+  border-radius: 10px;
+  border: 1px solid #1f2937;
+}
+
+.upgrade-card.owned {
+  border-color: #34d399;
+  background: #064e3b20;
+}
+
+.upgrade-card button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Achievement row ── */
+.achievement-row {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #111827;
+  border: 1px solid #1f2937;
+}
+
+.achievement-row.unlocked {
+  border-color: #fbbf24;
+  background: #42200640;
+}
+
+.achievement-row.locked { opacity: 0.45; }
+
+/* ── Trade log ── */
+.log-buy { color: #34d399; }
+.log-sell { color: #f87171; }
+.log-short { color: #fb923c; }
+.log-cover { color: #60a5fa; }
+.log-profit { color: #34d399; }
+.log-loss { color: #f87171; }
+
+/* ── Pulse ── */
 @keyframes pulse-slow {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 2s ease-in-out infinite;
+.animate-pulse-slow { animation: pulse-slow 2s ease-in-out infinite; }
+
+/* ── Trade log summary marker ── */
+details summary::-webkit-details-marker { display: none; }
+details summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 0.15s;
 }
 
-/* ── Disabled state ── */
-.trade-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  transform: none !important;
+details[open] summary::before {
+  transform: rotate(90deg);
 }
