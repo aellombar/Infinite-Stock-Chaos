@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // Balance tuned v3 — see megaprompt Phase 3
+  // Balance tuned v4 — regimes, news pool, combos
   const Config = {
     START_CASH: 1000,
     START_PRICE: 100,
@@ -19,6 +19,12 @@
     MARGIN_CALL_THRESHOLD: 0.6,
     MARGIN_CALL_TIME: 8000,
     MAX_CRASH_MAGNITUDE: 0.35,
+    HEADLINE_REPEAT_COOLDOWN: 25,
+    PROCEDURAL_NEWS_CHANCE: 0.4,
+    REGIME_DURATION_MIN: 15000,
+    REGIME_DURATION_MAX: 30000,
+    MEAN_REVERSION_STRENGTH: 0.00012,
+    COMBO_MAX: 3,
     RETIRE_MILESTONES: [
       { amount: 5000, bonus: 40 },
       { amount: 10000, bonus: 100 },
@@ -83,20 +89,20 @@
       { id: 'thick_skin', name: 'Thick Skin', desc: 'Start each run with +$500 cash', cost: 50 },
       { id: 'spidey_sense', name: 'Spidey Sense', desc: 'QTE window lasts 3 seconds', cost: 75 },
       { id: 'crash_padding', name: 'Crash Padding', desc: 'Crash news deals 15% less damage', cost: 100 },
-      { id: 'insider_friend', name: 'Insider Friend', desc: 'Reveal FAKE news after 0.5s', cost: 80 },
+      { id: 'insider_friend', name: 'Insider Friend', desc: 'Sometimes flags fake news (50% accuracy)', cost: 80 },
       { id: 'chaos_magnet', name: 'Chaos Magnet', desc: 'Earn 25% more Chaos Points', cost: 120 },
       { id: 'second_chance', name: 'Second Chance', desc: 'Survive bankruptcy once at 25% cash', cost: 150 },
-      { id: 'vpn_wallst', name: 'VPN to Wall St', desc: 'See next headline 1s early', cost: 60 },
+      { id: 'vpn_wallst', name: 'VPN to Wall St', desc: 'Vague sentiment hint before news', cost: 60 },
       { id: 'coffee_iv', name: 'Coffee IV Drip', desc: 'News events arrive 10% slower', cost: 70 },
       { id: 'lawyer', name: 'Lawyer on Retainer', desc: 'SEC Raid fines reduced 50%', cost: 90 },
       { id: 'yolo_gene', name: 'YOLO Gene', desc: 'Unlock 120% margin trade size', cost: 110 },
-      { id: 'tinfoil_hat', name: 'Tinfoil Hat', desc: 'FAKE badge shown immediately', cost: 85 },
+      { id: 'tinfoil_hat', name: 'Tinfoil Hat', desc: 'SUSPICIOUS badge on sketchy news', cost: 85 },
       { id: 'compound_interest', name: 'Compound Interest', desc: '+2% portfolio between waves', cost: 95 },
       { id: 'ghost_portfolio', name: 'Ghost Portfolio', desc: 'Undo last trade once per run', cost: 130 },
       { id: 'influencer_collab', name: 'Influencer Collab', desc: '+1 bonus CP per wave goal', cost: 75 },
       { id: 'dark_pool', name: 'Dark Pool Access', desc: 'Short up to 25% extra on margin', cost: 105 },
       { id: 'rug_pull_insurance', name: 'Rug Pull Insurance', desc: 'First crash each run capped at -20%', cost: 115 },
-      { id: 'vibe_analyst', name: 'Vibe Analyst', desc: 'Sparkline shows trend arrow', cost: 55 },
+      { id: 'vibe_analyst', name: 'Vibe Analyst', desc: 'Noisy sentiment meter (often wrong)', cost: 55 },
       { id: 'exit_liquidity', name: 'Exit Liquidity', desc: 'Cash Out gives +15% CP bonus', cost: 100 },
     ],
 
@@ -158,6 +164,90 @@
       const d = new Date();
       return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
     },
+    categoryLabel(type) {
+      if (type === 'moon' || type === 'surge') return 'BULLISH RUMOR';
+      if (type === 'crash' || type === 'massive_crash') return 'BEARISH ALERT';
+      if (type === 'sec_raid') return 'REGULATORY RISK';
+      return 'MARKET CHATTER';
+    },
+    codename() {
+      const codes = ['WHALE ALERT', 'DARK POOL', 'GAMMA SQUEEZE', 'VIBE SHIFT', 'INSIDER CHATTER', 'ALGO SPIKE', 'MEME SURGE'];
+      return codes[Utils.randInt(0, codes.length - 1)];
+    },
+  };
+
+  const NewsGenerator = {
+    pool: [],
+    recent: [],
+    entities: {
+      who: ['CEO', 'CFO', 'CTO', 'COO', 'intern', 'board chair', 'whale', 'analyst', 'Fed watcher', 'podcast host', 'Discord mod', 'NFT bro', 'short seller', 'day trader', 'compliance officer', 'PR team', 'ChatGPT instance', 'reply guy', 'accountant', 'lawyer', 'influencer', 'hedge fund', 'retail army', 'market maker', 'auditor'],
+      how: ['accidentally', 'proudly', 'legally', 'allegedly', 'ironically', 'desperately', 'quietly', 'loudly', 'publicly', 'privately', 'mistakenly', 'boldly', 'recklessly', 'casually', 'passionately'],
+      action: ['shorts', 'pumps', 'dumps', 'yolo-buys', 'liquidates', 'meme-posts', 'rug-pulls', 'hodls', 'stakeholders', 'diamond-hands', 'naked-calls', 'theta-gangs', 'the float', 'after-hours', 'pre-market'],
+      what: ['the stock', 'our ticker', '$CHAOS', 'competitor shares', 'employee 401ks', 'customer refunds', 'the cap table', 'board seats', 'the entire float', 'OTC volume', 'dark pool flow', 'options chain'],
+      where: ['during earnings call', 'on live TV', 'in a Twitter Space', 'at Burning Man', 'from a burner phone', 'while sleep-deprived', 'during a product demo', 'in a court filing', 'on a podcast', 'in a group chat', 'after one Reddit comment', 'because AI said so', 'during yoga retreat', 'on a yacht', "from airport Chili's", 'in Congress', 'in a leaked Slack', 'at a hackathon', 'during a blackout', 'on TikTok Live', 'in the metaverse', 'during all-hands', 'on LinkedIn'],
+      twist: ['stock rips anyway', 'markets unphased', 'analysts baffled', 'shorts in shambles', 'retail celebrates', 'SEC opens probe', 'non-apology issued', 'emergency board meeting', 'CEO doubles down', 'memes take credit', 'logic inverted', 'volume hits record', 'price does opposite', 'cope posted then deleted', 'lawyers involved', 'thread goes viral'],
+    },
+    typeCycle: ['crash', 'surge', 'moon', 'massive_crash'],
+    mags: { crash: [0.18, 0.38], surge: [0.12, 0.28], moon: [0.22, 0.48], massive_crash: [0.35, 0.55] },
+
+    init() {
+      this.pool = [...Config.NEWS_EVENTS];
+      this.recent = [];
+      const seen = new Set(this.pool.map((e) => e.headline));
+      let tries = 0;
+      while (this.pool.length < 160 && tries < 600) {
+        tries++;
+        const ev = this.generate();
+        if (!seen.has(ev.headline)) { seen.add(ev.headline); this.pool.push(ev); }
+      }
+    },
+
+    pick(arr) { return arr[Utils.randInt(0, arr.length - 1)]; },
+
+    generate() {
+      const e = this.entities;
+      const type = this.typeCycle[Utils.randInt(0, this.typeCycle.length - 1)];
+      const templates = [
+        () => `${this.pick(e.who)} ${this.pick(e.how)} ${this.pick(e.action)} ${this.pick(e.what)} ${this.pick(e.where)} — ${this.pick(e.twist)}`,
+        () => `BREAKING: ${this.pick(e.what)} ${this.pick(e.action)} ${this.pick(e.where)} after ${this.pick(e.who)} ${this.pick(e.how)} speaks — ${this.pick(e.twist)}`,
+        () => `Sources say ${this.pick(e.who)} ${this.pick(e.how)} ${this.pick(e.action)} ${this.pick(e.what)}; ${this.pick(e.twist)}`,
+        () => `${this.pick(e.who)} tells analysts "${this.pick(e.twist)}" ${this.pick(e.where)} — ${this.pick(e.what)} ${this.pick(e.action)}`,
+        () => `Leaked memo: ${this.pick(e.who)} plans to ${this.pick(e.action)} ${this.pick(e.what)} ${this.pick(e.where)} (${this.pick(e.twist)})`,
+      ];
+      const headline = templates[Utils.randInt(0, templates.length - 1)]();
+      return { headline, type, magnitude: [...this.mags[type]] };
+    },
+
+    remember(headline) {
+      this.recent.unshift(headline);
+      if (this.recent.length > Config.HEADLINE_REPEAT_COOLDOWN) this.recent.pop();
+    },
+
+    pickEvent(wave) {
+      if (wave === 3 || wave === 5) {
+        if (Utils.rand(0, 1) < 0.35) {
+          const bosses = Config.BOSS_EVENTS.filter((b) => !(wave === 5 && b.headline.includes('Meltdown')));
+          return bosses[Utils.randInt(0, bosses.length - 1)] || Config.BOSS_EVENTS[0];
+        }
+      }
+      if (Utils.rand(0, 1) < Config.PROCEDURAL_NEWS_CHANCE) {
+        let ev = this.generate();
+        let tries = 0;
+        while (this.recent.includes(ev.headline) && tries < 20) { ev = this.generate(); tries++; }
+        return ev;
+      }
+      const available = this.pool.filter((e) => !this.recent.includes(e.headline));
+      const src = available.length ? available : this.pool;
+      return src[Utils.randInt(0, src.length - 1)];
+    },
+  };
+
+  const Combo = {
+    count: 0,
+    reset() { this.count = 0; },
+    mult() { return 1 + Math.max(0, this.count - 1) * 0.1; },
+    onWin() { this.count = Math.min(this.count + 1, Config.COMBO_MAX); },
+    onBreak() { this.count = 0; },
   };
 
   const Storage = {
@@ -437,11 +527,44 @@
   const Market = {
     price: Config.START_PRICE, activeNews: null, difficulty: 'normal',
     firstCrashHappened: false, newsShield: false,
-    reset() { this.price = Config.START_PRICE; this.activeNews = null; this.firstCrashHappened = false; this.newsShield = false; },
+    waveAnchorPrice: Config.START_PRICE, regime: 'chop', regimeEnd: 0,
+    regimes: {
+      bull: { label: 'RISK-ON', drift: 0.06, volMult: 0.85 },
+      bear: { label: 'RISK-OFF', drift: -0.07, volMult: 1.0 },
+      chop: { label: 'CHOPPY', drift: 0, volMult: 1.15 },
+      mania: { label: 'UNHINGED', drift: 0, volMult: 1.8 },
+    },
+    reset() {
+      this.price = Config.START_PRICE;
+      this.activeNews = null;
+      this.firstCrashHappened = false;
+      this.newsShield = false;
+      this.waveAnchorPrice = Config.START_PRICE;
+      this.pickRegime();
+    },
+    setWaveAnchor() { this.waveAnchorPrice = this.price; },
+    pickRegime() {
+      const keys = Object.keys(this.regimes);
+      this.regime = keys[Utils.randInt(0, keys.length - 1)];
+      this.regimeEnd = performance.now() + Utils.rand(Config.REGIME_DURATION_MIN, Config.REGIME_DURATION_MAX);
+    },
+    updateRegime() {
+      if (performance.now() >= this.regimeEnd) this.pickRegime();
+    },
+    getRegime() { return this.regimes[this.regime] || this.regimes.chop; },
     getDiffConfig() { return Config.DIFFICULTIES[this.difficulty] || Config.DIFFICULTIES.normal; },
     applyRandomWalk(dt) {
-      const jitter = (Utils.rand(-1, 1));
-      this.price *= 1 + (jitter * Config.BASE_VOLATILITY * (dt / 1000)) / 100;
+      this.updateRegime();
+      const r = this.getRegime();
+      const jitter = Utils.rand(-1, 1);
+      const drift = (r.drift || 0) * (dt / 1000) / 100;
+      const vol = Config.BASE_VOLATILITY * (r.volMult || 1) * (dt / 1000) / 100;
+      this.price *= 1 + drift + jitter * vol;
+      const anchor = this.waveAnchorPrice || Config.START_PRICE;
+      const deviation = (this.price - anchor) / anchor;
+      if (Math.abs(deviation) > 0.22) {
+        this.price *= 1 - deviation * Config.MEAN_REVERSION_STRENGTH * dt;
+      }
     },
     applyNewsEffect(dt, upgrades) {
       if (!this.activeNews) return false;
@@ -563,13 +686,28 @@
 
   const WaveState = {
     current: 1, duration: 75000, startTime: 0, goal: null, goalMet: false,
-    waveStartPortfolio: 0, waveTrades: 0, waveQTEWins: 0, waveShortProfit: false,
+    waveStartPortfolio: 0, wavePeak: 0, waveTrades: 0, waveQTEWins: 0, waveShortProfit: false,
     soldDuringMoon: false, qteBoost: false, intermission: false,
     retiredMilestones: new Set(),
     resetWaveStats() {
       this.waveStartPortfolio = Portfolio.value();
+      this.wavePeak = Portfolio.value();
       this.waveTrades = 0; this.waveQTEWins = 0;
       this.waveShortProfit = false; this.soldDuringMoon = false; this.goalMet = false;
+    },
+    trackPeak() {
+      const pv = Portfolio.value();
+      if (pv > this.wavePeak) this.wavePeak = pv;
+    },
+    calcWaveRank(goalMet) {
+      const pv = Portfolio.value();
+      const peak = this.wavePeak || pv;
+      const drawdown = peak > 0 ? 1 - pv / peak : 0;
+      if (goalMet && drawdown < 0.08) return 'S';
+      if (goalMet) return 'A';
+      if (!goalMet && pv >= this.waveStartPortfolio * 0.85) return 'B';
+      if (!goalMet && pv >= this.waveStartPortfolio * 0.6) return 'C';
+      return 'D';
     },
     pickGoal() {
       this.goal = this.buildGoalPreview(this.waveStartPortfolio);
@@ -614,20 +752,14 @@
       if (Meta.has('coffee_iv')) delay *= 1.1;
       this.timer = setTimeout(() => this.trigger(game), delay);
     },
-    pickEvent(wave) {
-      if (wave === 3 || wave === 5) {
-        const bosses = Config.BOSS_EVENTS.filter((b) => !(wave === 5 && b.headline.includes('Meltdown')));
-        return bosses[Utils.randInt(0, bosses.length - 1)] || Config.BOSS_EVENTS[0];
-      }
-      return Config.NEWS_EVENTS[Utils.randInt(0, Config.NEWS_EVENTS.length - 1)];
-    },
+    pickEvent(wave) { return NewsGenerator.pickEvent(wave); },
     setNextPreview() {
       const ev = this.pickEvent(WaveState.current);
       this.nextEvent = ev;
       if (ev.boss) {
-        UI.showNextNewsHint(`⚠️ BOSS INCOMING: ${ev.headline}`);
+        UI.showNextNewsHint('⚠️ BOSS SIGNAL — brace for impact');
       } else if (Meta.has('vpn_wallst')) {
-        UI.showNextNewsHint(`Incoming: ${ev.headline}`);
+        UI.showNextNewsHint(`$CHAO: ${Utils.codename()} · ${Utils.categoryLabel(ev.type)}`);
       }
     },
     trigger(game) {
@@ -635,6 +767,7 @@
       const event = this.nextEvent || this.pickEvent(WaveState.current);
       this.nextEvent = null;
       UI.hideNextNewsHint();
+      NewsGenerator.remember(event.headline);
       const diff = Market.getDiffConfig();
       let magnitude = Utils.rand(event.magnitude[0], event.magnitude[1]) * diff.magnitudeMult;
       magnitude *= 1 + (WaveState.current - 1) * 0.05;
@@ -689,12 +822,17 @@
       if (event.boss) RunStats.bossSurvived = true;
 
       if (isFake) {
-        if (Meta.has('tinfoil_hat')) UI.revealFakeNews();
-        const delay = Meta.has('insider_friend') ? 500 : 1000;
+        if (Meta.has('tinfoil_hat')) UI.showSuspiciousStamp();
+        const delay = Meta.has('insider_friend') ? Utils.rand(800, 1500) : 1000;
         clearTimeout(this.pendingFake);
         this.pendingFake = setTimeout(() => {
-          UI.revealFakeNews();
-          if (Portfolio.value() > newsItem.startPortfolio) Achievements.unlock('fake_out', Meta.data);
+          const wrongCall = Meta.has('insider_friend') && Utils.rand(0, 1) < 0.5;
+          if (!wrongCall) {
+            UI.revealFakeNews();
+            if (Portfolio.value() > newsItem.startPortfolio) Achievements.unlock('fake_out', Meta.data);
+          } else {
+            UI.showFakeWrongCall();
+          }
         }, delay);
       }
 
@@ -775,36 +913,50 @@
     },
     respond(panic) {
       if (!this.active || this.resolved) return;
+      if (navigator.vibrate) navigator.vibrate(12);
       this.resolve(panic);
     },
     resolve(panic) {
+      if (this.resolved) return;
       this.resolved = true; this.active = false;
       cancelAnimationFrame(this.animFrame);
-      UI.hideQTE();
       if (this.isSec) {
+        UI.hideQTE();
         SECRaid.resolve(panic === true);
         return;
       }
-      if (panic === null) return;
+      if (panic === null) {
+        if (!this.isBoss) Combo.onBreak();
+        UI.showQTEFeedback('TOO LATE', 'late');
+        setTimeout(() => UI.hideQTE(), 450);
+        UI.updateCombo();
+        return;
+      }
 
       const bearish = Utils.isBearish(this.newsType);
       const correct = bearish ? panic : !panic;
-      const mult = (WaveState.qteBoost ? 2 : 1) * (this.isBoss ? 1.5 : 1);
+      const mult = (WaveState.qteBoost ? 2 : 1) * (this.isBoss ? 1.5 : 1) * Combo.mult();
 
       if (correct) {
+        Combo.onWin();
         RunStats.qteWins++; WaveState.waveQTEWins++;
         const bonus = Math.min(Portfolio.value() * 0.02, Math.max(30, Portfolio.cash * 0.03)) * mult;
         Portfolio.cash += bonus;
         AudioEngine.play('qte_win');
+        UI.showQTEFeedback(`+${Utils.formatMoney(bonus)}`, 'win');
         UI.spawnFloatText(document.getElementById('qte-overlay'), `+${Utils.formatMoney(bonus)}`, true);
         if (RunStats.qteWins >= 5) Achievements.unlock('quick_fingers', Meta.data);
       } else {
+        Combo.onBreak();
         const penalty = Math.min(Portfolio.cash, Portfolio.value() * 0.02);
         Portfolio.cash = Math.max(0, Portfolio.cash - penalty);
         AudioEngine.play('qte_lose');
+        UI.showQTEFeedback(`-${Utils.formatMoney(penalty)}`, 'lose');
         UI.spawnFloatText(document.getElementById('qte-overlay'), `-${Utils.formatMoney(penalty)}`, false);
       }
+      UI.updateCombo();
       UI.updatePortfolio();
+      setTimeout(() => UI.hideQTE(), correct ? 350 : 500);
     },
   };
 
@@ -956,6 +1108,7 @@
         'upgrades-owned-count','upgrades-total-count','achievements-unlocked-count',
         'achievements-total-count','sec-countdown','margin-timer-bar','retire-milestone-text',
         'retire-bonus','trade-status-hint','debug-overlay',
+        'regime-badge','combo-badge','session-pnl','qte-feedback','qte-backdrop','inter-wave-rank',
       ].forEach((id) => { this.els[id] = document.getElementById(id); });
     },
     show(id) { this.els[id]?.classList.remove('hidden'); },
@@ -985,10 +1138,16 @@
       this.els['chaos-points-badge'].textContent = `${Meta.data.chaosPoints} CP`;
       if (Meta.has('vibe_analyst')) {
         const trend = Sparkline.getTrend();
+        const noisy = trend + Utils.rand(-8, 8);
         this.els['vibe-arrow'].classList.remove('hidden');
-        this.els['vibe-arrow'].textContent = trend > 5 ? '📈' : trend < -5 ? '📉' : '➡️';
-        this.els['spark-trend'].textContent = trend > 0 ? '↑' : trend < 0 ? '↓' : '—';
+        this.els['vibe-arrow'].textContent = noisy > 5 ? '📈' : noisy < -5 ? '📉' : '➡️';
+        const lie = Utils.rand(0, 1) < 0.35;
+        const arrow = lie ? (noisy > 0 ? '↓' : '↑') : (trend > 0 ? '↑' : trend < 0 ? '↓' : '—');
+        this.els['spark-trend'].textContent = arrow;
       }
+      this.updateSessionPnl();
+      this.updateRegime();
+      this.updateCombo();
       this.updateTradeButtons();
     },
     updateTradeButtons() {
@@ -1039,7 +1198,18 @@
       this.els['fake-news-stamp'].classList.add('hidden');
       banner.classList.remove('flash'); void banner.offsetWidth; banner.classList.add('flash');
     },
-    revealFakeNews() { this.els['fake-news-stamp'].classList.remove('hidden'); },
+    revealFakeNews() {
+      this.els['fake-news-stamp'].textContent = 'FAKE NEWS';
+      this.els['fake-news-stamp'].classList.remove('hidden');
+    },
+    showSuspiciousStamp() {
+      this.els['fake-news-stamp'].textContent = 'SUSPICIOUS';
+      this.els['fake-news-stamp'].classList.remove('hidden');
+    },
+    showFakeWrongCall() {
+      this.els['fake-news-stamp'].textContent = 'WRONG CALL';
+      this.els['fake-news-stamp'].classList.remove('hidden');
+    },
     showNextNewsHint(h) {
       const el = this.els['next-news-hint'];
       if (!el) return;
@@ -1047,13 +1217,48 @@
       el.classList.remove('hidden');
     },
     hideNextNewsHint() { this.els['next-news-hint']?.classList.add('hidden'); },
-    showQTE(prompt, dur) {
+    showQTE(prompt) {
       this.els['qte-prompt'].textContent = prompt;
       this.els['qte-timer-bar'].style.width = '100%';
+      this.els['qte-feedback']?.classList.add('hidden');
       this.show('qte-overlay');
+      document.body.classList.add('qte-active');
+      requestAnimationFrame(() => document.getElementById('qte-yes')?.focus());
     },
     updateQTETimer(r) { this.els['qte-timer-bar'].style.width = `${r * 100}%`; },
-    hideQTE() { this.hide('qte-overlay'); },
+    showQTEFeedback(text, cls) {
+      const el = this.els['qte-feedback'];
+      if (!el) return;
+      el.textContent = text;
+      el.className = `qte-feedback ${cls}`;
+      el.classList.remove('hidden');
+    },
+    hideQTE() {
+      this.hide('qte-overlay');
+      document.body.classList.remove('qte-active');
+      this.els['qte-feedback']?.classList.add('hidden');
+    },
+    updateRegime() {
+      const el = this.els['regime-badge'];
+      if (!el) return;
+      const r = Market.getRegime();
+      el.textContent = r.label;
+      el.className = `badge badge-regime regime-${Market.regime}`;
+    },
+    updateCombo() {
+      const el = this.els['combo-badge'];
+      if (!el) return;
+      if (Combo.count <= 1) { el.classList.add('hidden'); return; }
+      el.textContent = `×${Combo.count} COMBO`;
+      el.classList.remove('hidden');
+    },
+    updateSessionPnl() {
+      const el = this.els['session-pnl'];
+      if (!el) return;
+      const pct = ((Portfolio.value() - Portfolio.startCash) / Portfolio.startCash) * 100;
+      el.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+      el.className = `session-pnl ${pct >= 0 ? 'up' : 'down'}`;
+    },
     showTradingFrozen(v) {
       this.els['trading-frozen']?.classList.toggle('hidden', !v);
     },
@@ -1165,6 +1370,9 @@
       ).join('');
     },
     showIntermission(goalMet) {
+      const rank = WaveState.calcWaveRank(goalMet);
+      this.els['inter-wave-rank'].textContent = `RANK: ${rank}`;
+      this.els['inter-wave-rank'].className = `text-center font-display text-2xl font-black mb-2 rank-${rank.toLowerCase()}`;
       this.els['inter-wave-num'].textContent = WaveState.current;
       this.els['inter-goal-result'].textContent = goalMet
         ? '✅ Wave goal completed! +20 CP bonus incoming'
@@ -1209,8 +1417,20 @@
     lastTimestamp: 0, difficulty: 'normal', secondChanceUsed: false,
     marginCallActive: false, marginTimer: null, retirePrompted: new Set(),
 
-    canTrade() {
-      return !this.getTradeBlockReason();
+    handleKeydown(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (QTE.active && !QTE.resolved) {
+        const panicKeys = ['y', 'Y', ' ', 'ArrowLeft', 'a', 'A'];
+        const hodlKeys = ['n', 'N', 'Shift', 'ArrowRight', 'd', 'D'];
+        if (panicKeys.includes(e.key)) { e.preventDefault(); QTE.respond(true); return; }
+        if (hodlKeys.includes(e.key)) { e.preventDefault(); QTE.respond(false); return; }
+        return;
+      }
+      if (!this.running || this.gameOver || this.paused || WaveState.intermission) return;
+      const tradeMap = { '1': 'buy', 'q': 'buy', 'Q': 'buy', '2': 'sell', 'w': 'sell', 'W': 'sell', '3': 'short', 'e': 'short', 'E': 'short', '4': 'cover', 'r': 'cover', 'R': 'cover' };
+      if (tradeMap[e.key]) { e.preventDefault(); this.trade(tradeMap[e.key]); return; }
+      if (e.key === '[') { Trading.tradeSizeIndex = Math.max(0, Trading.tradeSizeIndex - 1); UI.updateTradeChips(); }
+      if (e.key === ']') { Trading.tradeSizeIndex = Math.min(Trading.getSizes().length - 1, Trading.tradeSizeIndex + 1); UI.updateTradeChips(); }
     },
     getTradeBlockReason() {
       if (!this.running || this.gameOver) return 'GAME OVER';
@@ -1221,9 +1441,13 @@
       if (this.tradingFrozen) return 'FROZEN';
       return '';
     },
+    canTrade() {
+      return !this.getTradeBlockReason();
+    },
 
     init() {
       UI.cache();
+      NewsGenerator.init();
       Meta.data = Storage.load();
       Achievements.load(Meta.data.achievements);
       Chart.init(document.getElementById('stock-chart'), document.getElementById('chart-container'));
@@ -1315,8 +1539,9 @@
         Trading.tradeSizeIndex = parseInt(e.target.value, 10);
         UI.updateTradeChips();
       });
-      document.getElementById('qte-yes').addEventListener('click', () => QTE.respond(true));
-      document.getElementById('qte-no').addEventListener('click', () => QTE.respond(false));
+      document.getElementById('qte-yes').addEventListener('click', (e) => { e.stopPropagation(); QTE.respond(true); });
+      document.getElementById('qte-no').addEventListener('click', (e) => { e.stopPropagation(); QTE.respond(false); });
+      document.getElementById('qte-backdrop')?.addEventListener('click', () => {});
       document.getElementById('keep-trading-btn').addEventListener('click', () => this.continueRun());
       document.getElementById('cash-out-btn').addEventListener('click', () => this.cashOut());
       document.getElementById('wave-shop-items').addEventListener('click', (e) => {
@@ -1338,11 +1563,8 @@
           this.debug = !this.debug;
           UI.els['debug-overlay']?.classList.toggle('hidden', !this.debug);
         }
-        if (e.key === 'Escape' && this.running && !this.gameOver && !WaveState.intermission) this.togglePause();
-        if (QTE.active && !QTE.resolved) {
-          if (e.key === 'y' || e.key === 'Y') QTE.respond(true);
-          if (e.key === 'n' || e.key === 'N') QTE.respond(false);
-        }
+        if (e.key === 'Escape' && this.running && !this.gameOver && !WaveState.intermission && !QTE.active) this.togglePause();
+        this.handleKeydown(e);
       });
       } catch (err) {
         console.error('bindEvents failed:', err);
@@ -1397,6 +1619,8 @@
       RunStats.reset(startCash);
       Trading.reset();
       Sparkline.reset(startCash);
+      Combo.reset();
+      NewsGenerator.recent = [];
       WaveState.current = 1;
       WaveState.intermission = false;
       WaveState.qteBoost = false;
@@ -1426,6 +1650,7 @@
       WaveState.duration = WaveState.getDuration();
       WaveState.startTime = performance.now();
       WaveState.resetWaveStats();
+      Market.setWaveAnchor();
       WaveState.pickGoal();
       RunStats.goalsTotal++;
       UI.updateWaveUI();
@@ -1633,7 +1858,7 @@
     },
 
     togglePause() {
-      if (!this.running || this.gameOver || WaveState.intermission) return;
+      if (!this.running || this.gameOver || WaveState.intermission || QTE.active) return;
       this.paused = !this.paused;
       if (this.paused) UI.show('pause-overlay'); else UI.hide('pause-overlay');
       UI.updateTradeButtons();
@@ -1653,6 +1878,7 @@
         if (crashing) Chart.shake();
         Chart.updatePoint(Market.price);
         RunStats.updatePeak();
+        WaveState.trackPeak();
         Sparkline.push(Portfolio.value());
         this.checkAchievements();
         this.checkRetirePrompt();
