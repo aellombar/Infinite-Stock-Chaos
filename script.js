@@ -892,7 +892,7 @@
     reset() {
       this.tradeLog = []; this.lastTrade = null; this.undoUsed = false;
       this.tradeSizeIndex = Math.min(this.tradeSizeIndex, this.getSizes().length - 1);
-      UI.renderTradeLog([]); UI.updateTradeSlider();
+      UI.renderTradeLog([]); UI.updateTradeChips();
     },
   };
 
@@ -904,19 +904,20 @@
         'retire-overlay','margin-overlay','sec-overlay','upgrades-overlay','achievements-overlay',
         'achievement-toast','portfolio-value','liquid-cash','total-shares','short-shares','short-pnl',
         'stock-price','news-text','news-banner','credibility-badge','fake-news-stamp','trend-badge',
-        'trade-size-slider','trade-size-label','trade-log','trade-log-count','difficulty-badge',
+        'trade-size-slider','trade-size-label','trade-size-chips','trade-log','trade-log-count',
+        'trade-log-overlay','log-btn','close-log-btn','difficulty-badge',
         'chaos-points-badge','menu-chaos-points','menu-streak','menu-best-streak','upgrade-chaos-points',
         'mute-btn','qte-prompt','qte-timer-bar','score-title','score-subtitle','score-peak',
         'score-trades','score-news','score-qte','score-chaos-earned','score-waves','score-goals',
         'score-streak-bonus','upgrades-list','achievements-list','achievement-toast-title',
         'achievement-toast-desc','setting-sound','setting-reduced-motion','setting-particles',
-        'wave-badge','wave-timer-bar','wave-timer-text','wave-goal-text','wave-goal-banner',
+        'wave-badge','wave-timer-bar','wave-timer-text','wave-goal-text',
         'inter-wave-num','inter-goal-result','inter-portfolio','inter-peak','inter-trades',
         'inter-goals','inter-next-goal','wave-shop-items','next-news-hint','spark-trend',
         'vibe-arrow','trading-frozen','undo-btn','owned-upgrades-preview','daily-seed-toggle',
         'upgrades-owned-count','upgrades-total-count','achievements-unlocked-count',
         'achievements-total-count','sec-countdown','margin-timer-bar','retire-milestone-text',
-        'retire-bonus','trade-size-marks',
+        'retire-bonus',
       ].forEach((id) => { this.els[id] = document.getElementById(id); });
     },
     show(id) { this.els[id]?.classList.remove('hidden'); },
@@ -929,14 +930,15 @@
       this.els['short-shares'].textContent = Utils.formatShares(Portfolio.shortShares);
       this.els['stock-price'].textContent = Utils.formatMoney(Market.price);
       const sp = Portfolio.shortPnL();
-      this.els['short-pnl'].textContent = Portfolio.shortShares > 0 ? `P&L: ${Utils.formatMoney(sp)}` : '';
-      this.els['short-pnl'].className = `font-mono text-[10px] ${sp >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
+      this.els['short-pnl'].textContent = Portfolio.shortShares > 0 ? Utils.formatMoney(sp) : '';
+      this.els['short-pnl'].className = `stat-sub ${sp >= 0 ? 'text-emerald-400' : 'text-red-400'}`;
       const profit = pv >= Portfolio.startCash;
       this.els['portfolio-value'].classList.toggle('neon-green', profit);
       this.els['portfolio-value'].classList.toggle('neon-red', !profit);
       const up = Chart.recentTrend >= 0;
-      this.els['trend-badge'].textContent = up ? '▲ BULLISH' : '▼ BEARISH';
-      this.els['trend-badge'].className = `absolute top-2 right-2 font-mono text-[10px] px-2 py-1 rounded border ${up ? 'border-emerald-700/50 text-emerald-400' : 'border-red-700/50 text-red-400'} bg-gray-900/90 z-10`;
+      const badge = this.els['trend-badge'];
+      badge.textContent = up ? '▲ BULL' : '▼ BEAR';
+      badge.className = `chart-trend-badge ${up ? 'text-emerald-400 border-emerald-700/50' : 'text-red-400 border-red-700/50'}`;
       const sizes = Trading.getSizes().map((s) => `${Math.round(s * 100)}%`);
       this.els['trade-size-label'].textContent = sizes[Trading.tradeSizeIndex] || '100%';
       const frozen = Game.tradingFrozen || Game.paused;
@@ -953,7 +955,7 @@
         const trend = Sparkline.getTrend();
         this.els['vibe-arrow'].classList.remove('hidden');
         this.els['vibe-arrow'].textContent = trend > 5 ? '📈' : trend < -5 ? '📉' : '➡️';
-        this.els['spark-trend'].textContent = trend > 0 ? 'trending up' : trend < 0 ? 'trending down' : 'flat';
+        this.els['spark-trend'].textContent = trend > 0 ? '↑' : trend < 0 ? '↓' : '—';
       }
     },
     setNews(headline, credibility, type, isFake) {
@@ -1028,20 +1030,32 @@
     },
     updateWaveUI() {
       this.els['wave-badge'].textContent = `DAY ${WaveState.current}/${Config.TOTAL_WAVES}`;
-      this.els['wave-goal-text'].textContent = WaveState.goal?.label || 'Survive';
+      this.els['wave-goal-text'].textContent = `🎯 ${WaveState.goal?.label || 'Survive'}`;
     },
     updateWaveTimer(remaining, total) {
       const pct = Math.max(0, remaining / total);
       this.els['wave-timer-bar'].style.width = `${pct * 100}%`;
       this.els['wave-timer-text'].textContent = `${Math.ceil(remaining / 1000)}s`;
     },
-    updateTradeSlider() {
+    updateTradeChips() {
       const sizes = Trading.getSizes();
       const slider = this.els['trade-size-slider'];
-      slider.max = sizes.length - 1;
-      if (Trading.tradeSizeIndex > slider.max) Trading.tradeSizeIndex = slider.max;
-      const marks = sizes.map((s) => `<span>${Math.round(s * 100)}%</span>`).join('');
-      if (this.els['trade-size-marks']) this.els['trade-size-marks'].innerHTML = marks;
+      if (slider) {
+        slider.max = sizes.length - 1;
+        if (Trading.tradeSizeIndex > slider.max) Trading.tradeSizeIndex = slider.max;
+        slider.value = Trading.tradeSizeIndex;
+      }
+      const chips = this.els['trade-size-chips'];
+      if (!chips) return;
+      chips.innerHTML = sizes.map((s, i) =>
+        `<button type="button" class="trade-size-chip ${i === Trading.tradeSizeIndex ? 'active' : ''}" data-size="${i}">${Math.round(s * 100)}%</button>`
+      ).join('');
+      this.els['trade-size-label'].textContent = `${Math.round(sizes[Trading.tradeSizeIndex] * 100)}%`;
+    },
+    toggleTradeLog(show) {
+      const open = show ?? this.els['trade-log-overlay']?.classList.contains('hidden');
+      if (open) this.els['trade-log-overlay']?.classList.remove('hidden');
+      else this.els['trade-log-overlay']?.classList.add('hidden');
     },
     showUndo() {
       if (Meta.has('ghost_portfolio') && !Trading.undoUsed) {
@@ -1150,7 +1164,7 @@
       UI.els['menu-streak'].textContent = Meta.data.winStreak;
       UI.els['menu-best-streak'].textContent = Meta.data.bestStreak;
       UI.renderOwnedPreview();
-      UI.updateTradeSlider();
+      UI.updateTradeChips();
       this.bindEvents();
       window.addEventListener('resize', () => this.onResize());
       requestAnimationFrame((t) => this.loop(t));
@@ -1177,7 +1191,7 @@
       });
       document.getElementById('upgrades-list').addEventListener('click', (e) => {
         const id = e.target.dataset?.upgrade;
-        if (id && Meta.buyUpgrade(id)) { UI.renderUpgrades(); UI.renderOwnedPreview(); UI.updateTradeSlider(); UI.els['menu-chaos-points'].textContent = Meta.data.chaosPoints; }
+        if (id && Meta.buyUpgrade(id)) { UI.renderUpgrades(); UI.renderOwnedPreview(); UI.updateTradeChips(); UI.els['menu-chaos-points'].textContent = Meta.data.chaosPoints; }
       });
       document.getElementById('pause-btn').addEventListener('click', () => this.togglePause());
       document.getElementById('resume-btn').addEventListener('click', () => this.togglePause());
@@ -1204,7 +1218,22 @@
       document.getElementById('short-btn').addEventListener('click', () => this.trade('short'));
       document.getElementById('cover-btn').addEventListener('click', () => this.trade('cover'));
       document.getElementById('undo-btn').addEventListener('click', () => Trading.undo());
-      UI.els['trade-size-slider'].addEventListener('input', (e) => { Trading.tradeSizeIndex = parseInt(e.target.value, 10); });
+      document.getElementById('log-btn').addEventListener('click', () => UI.toggleTradeLog(true));
+      document.getElementById('close-log-btn').addEventListener('click', () => UI.toggleTradeLog(false));
+      UI.els['trade-log-overlay']?.addEventListener('click', (e) => {
+        if (e.target === UI.els['trade-log-overlay']) UI.toggleTradeLog(false);
+      });
+      this.els['trade-size-chips']?.addEventListener('click', (e) => {
+        const idx = e.target.dataset?.size;
+        if (idx !== undefined) {
+          Trading.tradeSizeIndex = parseInt(idx, 10);
+          UI.updateTradeChips();
+        }
+      });
+      UI.els['trade-size-slider']?.addEventListener('input', (e) => {
+        Trading.tradeSizeIndex = parseInt(e.target.value, 10);
+        UI.updateTradeChips();
+      });
       document.getElementById('qte-yes').addEventListener('click', () => QTE.respond(true));
       document.getElementById('qte-no').addEventListener('click', () => QTE.respond(false));
       document.getElementById('keep-trading-btn').addEventListener('click', () => this.continueRun());
@@ -1217,7 +1246,11 @@
       document.getElementById('retire-yes-btn').addEventListener('click', () => this.retireEarly(true));
       document.getElementById('retire-no-btn').addEventListener('click', () => this.retireEarly(false));
       document.getElementById('score-restart-btn').addEventListener('click', () => { UI.hide('score-overlay'); this.startRun(); });
-      document.getElementById('score-menu-btn').addEventListener('click', () => { UI.hide('score-overlay'); UI.hide('game-ui'); UI.show('main-menu'); this.refreshMenu(); });
+      document.getElementById('score-menu-btn').addEventListener('click', () => {
+        UI.hide('score-overlay'); UI.hide('game-ui'); UI.show('main-menu');
+        document.body.classList.remove('game-active');
+        this.refreshMenu();
+      });
       document.getElementById('score-upgrades-btn').addEventListener('click', () => { UI.renderUpgrades(); UI.show('upgrades-overlay'); });
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && this.running && !this.gameOver && !WaveState.intermission) this.togglePause();
@@ -1285,6 +1318,8 @@
       UI.hideQTE(); UI.hide('main-menu'); UI.hide('score-overlay');
       UI.hide('pause-overlay'); UI.hide('intermission-overlay'); UI.hide('retire-overlay');
       UI.hide('margin-overlay'); UI.show('game-ui');
+      document.body.classList.add('game-active');
+      UI.toggleTradeLog(false);
 
       UI.setDifficultyBadge(this.difficulty);
       UI.setNews('Markets open. Brace for chaos...', 'high', 'neutral', false);
@@ -1497,6 +1532,8 @@
       const pts = Meta.awardPoints(Meta.calcRunPoints(RunStats, kind === 'cashout' || kind === 'victory') + extraBonus);
       Storage.save(Meta.data);
       UI.hide('intermission-overlay'); UI.hide('game-ui');
+      document.body.classList.remove('game-active');
+      UI.toggleTradeLog(false);
       UI.showScoreScreen(kind, pts);
     },
 

@@ -211,117 +211,108 @@
   </div>
 
   <!-- Game UI -->
-  <div id="game-ui" class="max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 flex flex-col min-h-screen gap-3 sm:gap-4 hidden relative z-10">
+  <div id="game-ui" class="game-shell hidden">
 
-    <header class="flex items-center justify-between gap-2">
-      <div class="min-w-0">
-        <div class="flex flex-wrap items-center gap-2">
-          <span id="wave-badge" class="badge badge-wave">DAY 1/5</span>
-          <span id="difficulty-badge" class="badge badge-normal">NORMAL</span>
-          <span id="chaos-points-badge" class="badge badge-chaos">0 CP</span>
-        </div>
-        <div class="mt-2 flex items-center gap-2">
-          <div class="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden max-w-[140px]">
-            <div id="wave-timer-bar" class="h-full bg-emerald-500 transition-none" style="width:100%"></div>
-          </div>
-          <span id="wave-timer-text" class="font-mono text-[10px] text-gray-500">90s</span>
+    <!-- Slim top bar -->
+    <header class="game-topbar">
+      <div class="game-topbar-left">
+        <span id="wave-badge" class="badge badge-wave">DAY 1/5</span>
+        <span id="difficulty-badge" class="badge badge-normal">NORMAL</span>
+        <div class="wave-timer-inline">
+          <div class="wave-timer-track"><div id="wave-timer-bar" class="wave-timer-fill" style="width:100%"></div></div>
+          <span id="wave-timer-text" class="wave-timer-label">90s</span>
         </div>
       </div>
-      <div class="flex items-center gap-2 flex-shrink-0">
-        <button id="mute-btn" class="icon-btn" aria-label="Toggle sound">🔊</button>
-        <button id="pause-btn" class="icon-btn" aria-label="Pause">⏸</button>
-        <div class="text-right">
-          <p class="text-[10px] text-gray-500 font-mono uppercase">Price</p>
-          <p id="stock-price" class="font-mono text-xl sm:text-2xl font-bold text-white">$100.00</p>
+      <div class="game-topbar-right">
+        <button id="log-btn" class="icon-btn icon-btn-sm" aria-label="Trade log" title="Trade log">LOG</button>
+        <button id="undo-btn" class="icon-btn icon-btn-sm hidden" aria-label="Undo trade" title="Undo last trade">↩</button>
+        <button id="mute-btn" class="icon-btn icon-btn-sm" aria-label="Toggle sound">🔊</button>
+        <button id="pause-btn" class="icon-btn icon-btn-sm" aria-label="Pause">⏸</button>
+        <div class="game-price-pill">
+          <span id="stock-price" class="font-mono font-bold">$100.00</span>
         </div>
       </div>
     </header>
 
-    <div id="wave-goal-banner" class="glass-card rounded-lg px-3 py-2 border border-yellow-500/30 bg-yellow-950/20">
-      <p class="text-[10px] font-mono text-yellow-600 uppercase">Wave Goal</p>
-      <p id="wave-goal-text" class="text-xs sm:text-sm font-semibold text-yellow-200">Survive the chaos</p>
+    <!-- Portfolio + wave goal -->
+    <div class="game-portfolio-block">
+      <div class="game-portfolio-row">
+        <div class="portfolio-hero-compact">
+          <span class="portfolio-label">Portfolio</span>
+          <p id="portfolio-value" class="font-mono font-black neon-green">$1,000.00</p>
+        </div>
+        <span id="chaos-points-badge" class="badge badge-chaos badge-compact">0 CP</span>
+      </div>
+      <p id="wave-goal-text" class="wave-goal-pill">🎯 Survive the chaos</p>
     </div>
 
-    <section class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-      <div class="glass-card portfolio-hero col-span-2 sm:col-span-1 rounded-xl p-3 sm:p-5 border-2 border-emerald-500/30">
-        <p class="text-[10px] sm:text-xs text-gray-500 font-mono uppercase tracking-wider mb-1">Portfolio Value</p>
-        <p id="portfolio-value" class="font-mono text-3xl sm:text-5xl font-black neon-green leading-none">$1,000.00</p>
-      </div>
-      <div class="glass-card rounded-xl p-3 sm:p-4 border border-gray-700/80">
-        <p class="text-[10px] text-gray-500 font-mono uppercase mb-1">Cash</p>
-        <p id="liquid-cash" class="font-mono text-lg sm:text-xl font-bold text-cyan-400">$1,000.00</p>
-      </div>
-      <div class="glass-card rounded-xl p-3 sm:p-4 border border-gray-700/80">
-        <p class="text-[10px] text-gray-500 font-mono uppercase mb-1">Long</p>
-        <p id="total-shares" class="font-mono text-lg sm:text-xl font-bold text-purple-400">0</p>
-      </div>
-      <div class="glass-card rounded-xl p-3 sm:p-4 border border-gray-700/80">
-        <p class="text-[10px] text-gray-500 font-mono uppercase mb-1">Short</p>
-        <p id="short-shares" class="font-mono text-lg sm:text-xl font-bold text-orange-400">0</p>
-        <p id="short-pnl" class="font-mono text-[10px] text-gray-500"></p>
-      </div>
-    </section>
+    <!-- Compact stats strip -->
+    <div class="game-stats-strip">
+      <div class="stat-cell"><span class="stat-label">Cash</span><span id="liquid-cash" class="stat-value text-cyan-400">$1,000</span></div>
+      <div class="stat-cell"><span class="stat-label">Long</span><span id="total-shares" class="stat-value text-purple-400">0</span></div>
+      <div class="stat-cell"><span class="stat-label">Short</span><span id="short-shares" class="stat-value text-orange-400">0</span><span id="short-pnl" class="stat-sub"></span></div>
+    </div>
 
-    <div id="news-banner" class="news-banner news-crash relative overflow-hidden rounded-lg px-3 py-2 sm:py-3">
-      <div class="flex items-center gap-2 sm:gap-3">
-        <span class="news-breaking flex-shrink-0 text-[10px] font-black bg-red-600 text-white px-2 py-0.5 rounded uppercase">BREAKING</span>
-        <span id="credibility-badge" class="flex-shrink-0 text-[10px] font-black px-2 py-0.5 rounded uppercase credibility-high">HIGH</span>
-        <div class="marquee-wrap flex-1 min-w-0 overflow-hidden">
-          <p id="news-text" class="marquee-text text-xs sm:text-sm font-semibold whitespace-nowrap">Markets open. Brace for chaos...</p>
+    <!-- Main scroll-free flex area: news + chart -->
+    <div class="game-main">
+      <div id="news-banner" class="news-banner news-neutral game-news">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <span class="news-breaking flex-shrink-0 text-[9px] font-black bg-red-600 text-white px-1.5 py-0.5 rounded uppercase">NEWS</span>
+          <span id="credibility-badge" class="flex-shrink-0 text-[9px] font-black px-1.5 py-0.5 rounded uppercase credibility-high">HIGH</span>
+          <div class="marquee-wrap flex-1 min-w-0 overflow-hidden">
+            <p id="news-text" class="marquee-text text-[11px] font-semibold whitespace-nowrap">Markets open...</p>
+          </div>
+        </div>
+        <p id="next-news-hint" class="text-[9px] font-mono text-gray-500 mt-0.5 hidden"></p>
+        <p id="fake-news-stamp" class="fake-stamp hidden">FAKE NEWS</p>
+      </div>
+
+      <div id="trading-frozen" class="game-frozen hidden">⛔ TRADING FROZEN</div>
+
+      <div class="game-chart-area">
+        <div id="chart-container" class="chart-container">
+          <div class="chart-grid-bg absolute inset-0"></div>
+          <canvas id="stock-chart" class="chart-canvas"></canvas>
+          <canvas id="particle-canvas" class="particle-canvas"></canvas>
+          <div id="chart-error" class="chart-error hidden">Chart failed to load.</div>
+          <div id="trend-badge" class="chart-trend-badge">▲ BULLISH</div>
+          <div id="vibe-arrow" class="chart-vibe hidden">↗️</div>
+        </div>
+        <div class="game-sparkline-row">
+          <canvas id="sparkline-chart" class="sparkline-canvas"></canvas>
+          <span id="spark-trend" class="spark-trend-label"></span>
         </div>
       </div>
-      <p id="next-news-hint" class="text-[10px] font-mono text-gray-500 mt-1 hidden"></p>
-      <p id="fake-news-stamp" class="fake-stamp hidden">FAKE NEWS</p>
     </div>
 
-    <section>
-      <div id="chart-container" class="chart-container relative w-full min-h-[200px] sm:min-h-[260px] h-[200px] sm:h-[260px] rounded-xl border border-gray-700/80 overflow-hidden">
-        <div class="chart-grid-bg absolute inset-0"></div>
-        <canvas id="stock-chart" class="chart-canvas block w-full h-full relative z-[1]"></canvas>
-        <canvas id="particle-canvas" class="particle-canvas"></canvas>
-        <div id="chart-error" class="chart-error hidden">Chart failed to load. Refresh the page.</div>
-        <div id="trend-badge" class="absolute top-2 right-2 font-mono text-[10px] px-2 py-1 rounded border border-emerald-700/50 bg-gray-900/90 text-emerald-400 z-10">▲ BULLISH</div>
-        <div id="vibe-arrow" class="absolute bottom-2 right-2 text-2xl z-10 hidden">↗️</div>
+    <!-- Sticky bottom trade zone -->
+    <div class="game-trade-zone">
+      <div class="trade-size-row">
+        <span class="trade-size-title">Size</span>
+        <div id="trade-size-chips" class="trade-size-chips"></div>
+        <span id="trade-size-label" class="trade-size-active">100%</span>
       </div>
-      <div class="mt-2 glass-card rounded-lg border border-gray-800 p-1">
-        <div class="flex justify-between items-center px-2 pt-1">
-          <p class="text-[10px] text-gray-500 font-mono uppercase">Portfolio</p>
-          <span id="spark-trend" class="text-[10px] font-mono text-gray-500"></span>
-        </div>
-        <canvas id="sparkline-chart" class="block w-full h-12 sm:h-14"></canvas>
-      </div>
-    </section>
-
-    <div id="trading-frozen" class="hidden text-center py-1 text-xs font-mono text-red-400 animate-pulse">⛔ TRADING FROZEN — SEC RAID</div>
-
-    <div class="glass-card rounded-xl border border-gray-700/80 p-3 sm:p-4">
-      <div class="flex items-center justify-between mb-2">
-        <p class="text-xs font-mono text-gray-500 uppercase">Trade Size</p>
-        <p id="trade-size-label" class="font-mono font-bold text-emerald-400">100%</p>
-      </div>
-      <input type="range" id="trade-size-slider" min="0" max="3" value="3" step="1" class="trade-slider w-full" />
-      <div id="trade-size-marks" class="flex justify-between text-[10px] font-mono text-gray-600 mt-1">
-        <span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+      <div class="trade-buttons-grid">
+        <div class="relative"><button id="buy-btn" class="trade-btn trade-buy">📈 BUY</button></div>
+        <div class="relative"><button id="sell-btn" class="trade-btn trade-sell">📉 SELL</button></div>
+        <div class="relative"><button id="short-btn" class="trade-btn trade-short">🔻 SHORT</button></div>
+        <div class="relative"><button id="cover-btn" class="trade-btn trade-cover">🔼 COVER</button></div>
       </div>
     </div>
 
-    <section class="grid grid-cols-2 gap-2 sm:gap-3">
-      <div class="relative"><button id="buy-btn" class="trade-btn trade-buy w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-base">📈 BUY</button></div>
-      <div class="relative"><button id="sell-btn" class="trade-btn trade-sell w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-base">📉 SELL</button></div>
-      <div class="relative"><button id="short-btn" class="trade-btn trade-short w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-base">🔻 SHORT</button></div>
-      <div class="relative"><button id="cover-btn" class="trade-btn trade-cover w-full py-4 sm:py-5 rounded-xl font-black text-sm sm:text-base">🔼 COVER</button></div>
-    </section>
+    <!-- Hidden slider fallback for a11y -->
+    <input type="range" id="trade-size-slider" class="sr-only" min="0" max="3" value="3" step="1" tabindex="-1" aria-hidden="true" />
+  </div>
 
-    <div class="flex gap-2">
-      <button id="undo-btn" class="btn-secondary flex-1 py-2 text-xs font-mono rounded-lg hidden">↩ UNDO LAST TRADE</button>
+  <!-- Trade log overlay -->
+  <div id="trade-log-overlay" class="trade-log-overlay hidden">
+    <div class="trade-log-panel">
+      <div class="trade-log-header">
+        <h3 class="font-mono text-sm font-bold uppercase tracking-wider">Trade Log <span id="trade-log-count" class="text-gray-500">(0)</span></h3>
+        <button id="close-log-btn" class="icon-btn icon-btn-sm" aria-label="Close log">✕</button>
+      </div>
+      <div id="trade-log" class="trade-log-body font-mono text-[11px]"></div>
     </div>
-
-    <details class="glass-card rounded-xl border border-gray-800 overflow-hidden">
-      <summary class="px-4 py-3 cursor-pointer font-mono text-xs uppercase tracking-wider text-gray-400 hover:text-gray-200 select-none">
-        Trade Log <span id="trade-log-count" class="text-gray-600">(0)</span>
-      </summary>
-      <div id="trade-log" class="max-h-32 overflow-y-auto px-4 pb-3 space-y-1 font-mono text-[11px]"></div>
-    </details>
   </div>
 
   <script src="script.js"></script>
