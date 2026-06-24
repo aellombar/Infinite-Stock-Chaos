@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Roboto+Mono:wght@400;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <script>
     tailwind.config = {
@@ -86,6 +86,7 @@
     <div class="w-full max-w-lg px-6">
       <p class="text-center font-mono text-xs text-gray-500 uppercase tracking-widest mb-1">Trading Day Complete</p>
       <h2 class="text-3xl font-black text-center mb-1 text-emerald-400">WAVE <span id="inter-wave-num">1</span> CLEARED</h2>
+      <p id="inter-wave-rank" class="text-center font-display text-2xl font-black text-cyan-400 mb-2">RANK: B</p>
       <p id="inter-goal-result" class="text-center font-mono text-sm mb-6"></p>
 
       <div class="score-card rounded-xl p-4 mb-4 border border-gray-700 bg-gray-900/80">
@@ -155,14 +156,23 @@
   </div>
 
   <!-- QTE -->
-  <div id="qte-overlay" class="fixed inset-x-0 top-1/4 z-[85] flex justify-center pointer-events-none hidden">
-    <div class="qte-panel pointer-events-auto mx-4 w-full max-w-md rounded-xl border-2 border-yellow-400/60 bg-gray-900/95 p-4 text-center shadow-[0_0_40px_rgba(250,204,21,0.3)]">
-      <p id="qte-prompt" class="font-black text-lg sm:text-xl mb-3 text-yellow-300">PANIC SELL?</p>
-      <div class="flex gap-3 justify-center flex-wrap">
-        <button id="qte-yes" class="qte-btn bg-red-600 hover:bg-red-500 px-5 py-3 rounded-lg font-bold">Y — PANIC</button>
-        <button id="qte-no" class="qte-btn bg-emerald-600 hover:bg-emerald-500 px-5 py-3 rounded-lg font-bold">N — HODL</button>
+  <div id="qte-overlay" class="qte-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="qte-prompt">
+    <div id="qte-backdrop" class="qte-backdrop"></div>
+    <div class="qte-panel">
+      <p id="qte-prompt" class="qte-prompt">PANIC SELL?</p>
+      <p id="qte-feedback" class="qte-feedback hidden"></p>
+      <div class="qte-button-row">
+        <button id="qte-yes" type="button" class="qte-btn qte-panic">
+          <span class="qte-btn-label">PANIC</span>
+          <span class="qte-btn-key">Space</span>
+        </button>
+        <button id="qte-no" type="button" class="qte-btn qte-hodl">
+          <span class="qte-btn-label">HODL</span>
+          <span class="qte-btn-key">Shift</span>
+        </button>
       </div>
-      <div class="mt-3 h-1.5 bg-gray-800 rounded-full overflow-hidden"><div id="qte-timer-bar" class="h-full bg-yellow-400" style="width:100%"></div></div>
+      <div class="qte-timer-track"><div id="qte-timer-bar" class="qte-timer-fill" style="width:100%"></div></div>
+      <p class="qte-hint">Tap left or Space = PANIC · Tap right or Shift = HODL</p>
     </div>
   </div>
 
@@ -219,6 +229,7 @@
     <header class="game-topbar">
       <div class="game-topbar-left">
         <span id="wave-badge" class="badge badge-wave">DAY 1/5</span>
+        <span id="regime-badge" class="badge badge-regime">CHOP</span>
         <span id="difficulty-badge" class="badge badge-normal">NORMAL</span>
         <div class="wave-timer-inline">
           <div class="wave-timer-track"><div id="wave-timer-bar" class="wave-timer-fill" style="width:100%"></div></div>
@@ -240,10 +251,13 @@
     <div class="game-portfolio-block">
       <div class="game-portfolio-row">
         <div class="portfolio-hero-compact">
-          <span class="portfolio-label">Portfolio</span>
+          <span class="portfolio-label">Portfolio <span id="session-pnl" class="session-pnl">+0.0%</span></span>
           <p id="portfolio-value" class="font-mono font-black neon-green">$1,000.00</p>
         </div>
-        <span id="chaos-points-badge" class="badge badge-chaos badge-compact">0 CP</span>
+        <div class="portfolio-side-badges">
+          <span id="combo-badge" class="combo-badge hidden">×1</span>
+          <span id="chaos-points-badge" class="badge badge-chaos badge-compact">0 CP</span>
+        </div>
       </div>
       <p id="wave-goal-text" class="wave-goal-pill">🎯 Survive the chaos</p>
     </div>
@@ -296,10 +310,10 @@
         <span id="trade-size-label" class="trade-size-active">100%</span>
       </div>
       <div class="trade-buttons-grid">
-        <div class="relative"><button id="buy-btn" class="trade-btn trade-buy">📈 BUY</button></div>
-        <div class="relative"><button id="sell-btn" class="trade-btn trade-sell">📉 SELL</button></div>
-        <div class="relative"><button id="short-btn" class="trade-btn trade-short">🔻 SHORT</button></div>
-        <div class="relative"><button id="cover-btn" class="trade-btn trade-cover">🔼 COVER</button></div>
+        <div class="relative"><button id="buy-btn" class="trade-btn trade-buy"><span class="trade-key">1</span>📈 BUY</button></div>
+        <div class="relative"><button id="sell-btn" class="trade-btn trade-sell"><span class="trade-key">2</span>📉 SELL</button></div>
+        <div class="relative"><button id="short-btn" class="trade-btn trade-short"><span class="trade-key">3</span>🔻 SHORT</button></div>
+        <div class="relative"><button id="cover-btn" class="trade-btn trade-cover"><span class="trade-key">4</span>🔼 COVER</button></div>
       </div>
     </div>
 
