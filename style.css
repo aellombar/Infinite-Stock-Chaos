@@ -814,141 +814,116 @@ body.reduced-motion .bg-mesh { animation: none !important; }
 
 .setting-toggle { width: 44px; height: 24px; accent-color: #34d399; cursor: pointer; }
 
-/* ── QTE (bottom-anchored, full backdrop) ── */
-.qte-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 0 8px max(12px, env(safe-area-inset-bottom));
-  pointer-events: auto;
+/* ── Reaction bar (inline news reaction window) ── */
+.reaction-bar {
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.qte-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
-  pointer-events: auto;
-}
-
-.qte-panel {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 480px;
-  padding: 14px 12px 12px;
-  border-radius: 16px 16px 12px 12px;
-  border: 2px solid rgba(250, 204, 21, 0.5);
-  background: rgba(10, 10, 20, 0.95);
-  box-shadow: 0 -8px 60px rgba(250, 204, 21, 0.25), 0 0 0 1px rgba(255,255,255,0.05) inset;
-  pointer-events: auto;
-  animation: qte-slide-up 0.25s ease-out;
-}
-
-@keyframes qte-slide-up {
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.qte-prompt {
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: 1.15rem;
-  text-align: center;
-  color: #fde68a;
-  margin-bottom: 10px;
-}
-
-.qte-feedback {
-  text-align: center;
-  font-family: 'Roboto Mono', monospace;
-  font-size: 11px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.qte-feedback.win { color: #34d399; }
-.qte-feedback.lose { color: #f87171; }
-.qte-feedback.late { color: #9ca3af; }
-
-.qte-button-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.qte-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 64px;
-  padding: 10px 8px;
-  border-radius: 12px;
-  border: 2px solid transparent;
-  font-family: 'Space Grotesk', sans-serif;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.1s, box-shadow 0.15s, filter 0.15s;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-
-.qte-panic {
-  background: linear-gradient(180deg, #dc2626, #991b1b);
+.reaction-bar.react-bearish {
   border-color: rgba(248, 113, 113, 0.5);
-  color: white;
-  box-shadow: 0 0 24px rgba(239, 68, 68, 0.35);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.2);
+  animation: reaction-pulse-red 0.5s ease-out;
 }
 
-.qte-hodl {
-  background: linear-gradient(180deg, #059669, #047857);
+.reaction-bar.react-bullish {
   border-color: rgba(52, 211, 153, 0.5);
-  color: white;
-  box-shadow: 0 0 24px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.2);
+  animation: reaction-pulse-green 0.5s ease-out;
 }
 
-.qte-btn:active, .qte-btn.pressed {
-  transform: scale(0.96);
-  filter: brightness(1.15);
+.reaction-bar.react-boss {
+  border-color: rgba(167, 139, 250, 0.7);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.35);
+  animation: reaction-pulse-boss 0.5s ease-out;
 }
 
-.qte-btn-label { font-size: 1rem; }
-.qte-btn-key {
-  font-family: 'Roboto Mono', monospace;
-  font-size: 9px;
-  opacity: 0.7;
-  margin-top: 2px;
+@keyframes reaction-pulse-red {
+  0% { box-shadow: 0 0 40px rgba(239, 68, 68, 0.5); }
+  100% { box-shadow: 0 0 16px rgba(239, 68, 68, 0.2); }
+}
+@keyframes reaction-pulse-green {
+  0% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.5); }
+  100% { box-shadow: 0 0 16px rgba(16, 185, 129, 0.2); }
+}
+@keyframes reaction-pulse-boss {
+  0% { box-shadow: 0 0 50px rgba(139, 92, 246, 0.6); }
+  100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.35); }
 }
 
-.qte-timer-track {
-  height: 6px;
-  background: #1f2937;
+.reaction-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  position: relative;
+  overflow: hidden;
+}
+
+.reaction-label {
+  font-family: 'Space Grotesk', 'Roboto Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.reaction-timer-track {
+  flex: 1;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 3px;
   overflow: hidden;
-  margin-bottom: 6px;
 }
 
-.qte-timer-fill {
+.reaction-timer-fill {
   height: 100%;
-  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  border-radius: 3px;
   transition: width 0.05s linear;
 }
 
-.qte-hint {
-  text-align: center;
+.react-bearish .reaction-timer-fill { background: linear-gradient(90deg, #f87171, #dc2626); }
+.react-bullish .reaction-timer-fill { background: linear-gradient(90deg, #34d399, #059669); }
+.react-boss    .reaction-timer-fill { background: linear-gradient(90deg, #c084fc, #7c3aed); }
+
+.reaction-feedback {
   font-family: 'Roboto Mono', monospace;
-  font-size: 8px;
-  color: #6b7280;
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+  min-width: 80px;
+  text-align: right;
 }
+
+.reaction-feedback.win  { color: #34d399; }
+.reaction-feedback.lose { color: #f87171; }
+.reaction-feedback.late { color: #6b7280; }
+
+/* Trade button glow during reaction window */
+.trade-buttons-grid.reacting-bearish .trade-sell,
+.trade-buttons-grid.reacting-bearish .trade-short {
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.45);
+  border-color: rgba(248, 113, 113, 0.6);
+}
+.trade-buttons-grid.reacting-bullish .trade-buy,
+.trade-buttons-grid.reacting-bullish .trade-cover {
+  box-shadow: 0 0 18px rgba(16, 185, 129, 0.45);
+  border-color: rgba(52, 211, 153, 0.6);
+}
+.trade-buttons-grid.reacting-boss .trade-btn {
+  box-shadow: 0 0 22px rgba(139, 92, 246, 0.4);
+  border-color: rgba(167, 139, 250, 0.5);
+}
+
+body.reduced-motion .reaction-bar { animation: none !important; }
 
 /* ── Regime / combo / session P&L ── */
 .badge-regime {
@@ -1012,7 +987,7 @@ body.reduced-motion .bg-mesh { animation: none !important; }
 .rank-c { color: #9ca3af !important; }
 .rank-d { color: #f87171 !important; }
 
-body.qte-active { overflow: hidden; }
+/* body.qte-active removed — reaction bar is inline, no overlay */
 
 .trade-key {
   position: absolute;
@@ -1028,7 +1003,6 @@ body.qte-active { overflow: hidden; }
 
 .font-display { font-family: 'Space Grotesk', 'Inter', sans-serif; }
 
-body.reduced-motion .qte-panel { animation: none; }
 body.reduced-motion .badge-regime.regime-mania { animation: none; }
 
 /* ── Toast ── */

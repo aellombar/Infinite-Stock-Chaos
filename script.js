@@ -787,7 +787,7 @@
         Market.newsShield = false;
         UI.setNews(`🛡️ ${event.headline} (BLOCKED)`, credibility, event.type, isFake);
         AudioEngine.play('news');
-        if (!event.boss) QTE.start(game, event.type, isFake, false, false);
+        if (!event.boss) QTE.start(game, event.type, isFake, false);
         this.setNextPreview();
         this.schedule(game);
         return;
@@ -801,7 +801,7 @@
       };
       Market.activeNews = newsItem;
       RunStats.newsSurvived++;
-      if (event.boss) QTE.start(game, event.type, isFake, true, false);
+      if (event.boss) QTE.start(game, event.type, isFake, true);
 
       UI.setNews(event.headline, credibility, event.type, isFake);
       AudioEngine.play('news');
@@ -836,7 +836,7 @@
         }, delay);
       }
 
-      if (!event.boss) QTE.start(game, event.type, isFake, false, false);
+      if (!event.boss) QTE.start(game, event.type, isFake, false);
       this.setNextPreview();
       this.schedule(game);
     },
@@ -854,21 +854,25 @@
       UI.show('sec-overlay');
       UI.showTradingFrozen(true);
       UI.updateTradeButtons();
-      UI.setNews('SEC RAID — Trading frozen! Answer the QTE!', 'high', 'sec_raid', false);
+      UI.setNews('SEC RAID — Trading frozen for 5 seconds!', 'high', 'sec_raid', false);
       AudioEngine.play('crash');
-      QTE.start(game, 'crash', false, false, true);
       this.tick();
     },
     tick() {
       if (!this.active) return;
       UI.setSecCountdown(this.countdown);
-      if (this.countdown <= 0) { this.end(true); return; }
+      if (this.countdown <= 0) {
+        // Auto-resolve: 50% chance of fine
+        const fine = Utils.rand(0, 1) < 0.5;
+        this.resolve(!fine);
+        return;
+      }
       this.countdown--;
       this.timer = setTimeout(() => this.tick(), 1000);
     },
-    resolve(success) {
+    resolve(survived) {
       if (!this.active) return;
-      if (success) {
+      if (survived) {
         RunStats.secSurvived = true;
         Achievements.unlock('sec_survivor', Meta.data);
         this.end(true);
@@ -892,139 +896,131 @@
     },
   };
 
+  // QTE is now a reaction window — no overlay popup.
+  // When news fires, a slim bar appears above trade buttons with a draining timer.
+  // The player earns bonuses by making a SMART trade during the window:
+  //   bullish (moon/surge)  → buy or cover = smart
+  //   bearish (crash)       → sell or short = smart
+  //   any trade             → counts, wrong trade = penalty
+  //   no trade before timer → timeout penalty + combo break
   const QTE = {
-    active: false, startTime: 0, duration: 2000, newsType: null, resolved: false,
-    animFrame: null, game: null, isBoss: false, isSec: false, isFake: false, expected: 'hodl',
-
-    // Matrix (effectiveType = real price impact, not headline):
-    // | effectiveType | expected | prompt                 |
-    // | bearish       | panic    | PANIC SELL?            |
-    // | bullish       | hodl     | DIAMOND HANDS?         |
-    // | boss+bearish  | panic    | BOSS — PANIC SELL?     |
-    // | boss+bullish  | hodl     | BOSS — DIAMOND HANDS?  |
-    // | fake news     | invert(displayType) for scoring  |
-    // | SEC raid      | panic    | COMPLY (yes) / LIE (no)|
+    active: false, resolved: false,
+    animFrame: null, game: null,
+    isBoss: false, isFake: false,
+    newsType: null, effectiveType: null,
+    startTime: 0, duration: 2000,
 
     getEffectiveType(newsType, isFake) {
       return isFake ? Utils.invertType(newsType) : newsType;
     },
 
-    getExpectedAction(newsType, isFake, isBoss, isSec) {
-      if (isSec) return 'panic';
-      const eff = this.getEffectiveType(newsType, isFake);
-      if (Utils.isBearish(eff)) return 'panic';
-      return 'hodl';
+    isSmartTrade(tradeType) {
+      // smart = correct directional call based on real price movement
+      const bullish = Utils.isBullish(this.effectiveType);
+      if (bullish) return tradeType === 'buy' || tradeType === 'cover';
+      return tradeType === 'sell' || tradeType === 'short';
     },
 
-    getPrompt(newsType, isFake, isBoss, isSec) {
-      if (isSec) return 'SEC RAID — COMPLY OR LIE?';
-      const eff = this.getEffectiveType(newsType, isFake);
-      const suffix = isFake ? ' · Headline may be fake' : '';
-      if (isBoss) {
-        return Utils.isBearish(eff)
-          ? `BOSS FIGHT — PANIC SELL?${suffix}`
-          : `BOSS FIGHT — DIAMOND HANDS?${suffix}`;
-      }
-      return Utils.isBearish(eff) ? `PANIC SELL?${suffix}` : `DIAMOND HANDS?${suffix}`;
+    getLabel() {
+      const bullish = Utils.isBullish(this.effectiveType);
+      const fakeHint = this.isFake ? ' · ?FAKE' : '';
+      if (this.isBoss) return `👹 BOSS${fakeHint} — ${bullish ? '🚀 MOON' : '💀 CRASH'} — TRADE NOW`;
+      return bullish ? `🚀 MOON${fakeHint} — position now!` : `⚡ CRASH${fakeHint} — react fast!`;
     },
 
-    choiceLabel(panic, isSec) {
-      if (isSec) return panic ? 'COMPLY' : 'LIE';
-      return panic ? 'PANIC' : 'HODL';
+    getBarClass() {
+      if (this.isBoss) return 'react-boss';
+      return Utils.isBullish(this.effectiveType) ? 'react-bullish' : 'react-bearish';
     },
 
-    expectedLabel(expected, isSec) {
-      if (isSec) return expected === 'panic' ? 'COMPLY' : 'LIE';
-      return expected === 'panic' ? 'PANIC' : 'HODL';
+    getGridClass() {
+      if (this.isBoss) return 'reacting-boss';
+      return Utils.isBullish(this.effectiveType) ? 'reacting-bullish' : 'reacting-bearish';
     },
 
-    isChoiceCorrect(panic, expected) {
-      return expected === 'panic' ? panic === true : panic === false;
-    },
-
-    resultFeedback(panic, correct, expected, isSec, moneyText) {
-      const want = this.expectedLabel(expected, isSec);
-      if (correct) return moneyText ? `CORRECT — ${want} (${moneyText})` : `CORRECT — ${want}`;
-      if (isSec) return `WRONG — you chose ${this.choiceLabel(panic, isSec)} (needed ${want})`;
-      return panic ? `WRONG — you PANIC'd (needed ${want})` : `WRONG — you HODL'd (needed ${want})`;
-    },
-
-    start(game, newsType, isFake, isBoss, isSec) {
+    start(game, newsType, isFake, isBoss) {
+      if (this.active) this.cancel();
       this.game = game;
       this.active = true;
       this.resolved = false;
       this.newsType = newsType;
       this.isFake = !!isFake;
       this.isBoss = !!isBoss;
-      this.isSec = !!isSec;
-      this.expected = this.getExpectedAction(newsType, isFake, isBoss, isSec);
-      this.duration = isBoss ? 2500 : Meta.getQteDuration();
+      this.effectiveType = this.getEffectiveType(newsType, isFake);
+      this.duration = isBoss ? 1500 : Meta.getQteDuration();
       this.startTime = performance.now();
-      UI.showQTE(this.getPrompt(newsType, isFake, isBoss, isSec), { isSec });
+      UI.showReactionBar(this.getLabel(), this.getBarClass(), this.getGridClass());
       this.tick();
     },
 
     tick() {
       if (!this.active || this.resolved) return;
       const elapsed = performance.now() - this.startTime;
-      UI.updateQTETimer(Math.max(0, 1 - elapsed / this.duration));
-      if (elapsed >= this.duration) { this.resolve(null); return; }
+      const ratio = Math.max(0, 1 - elapsed / this.duration);
+      UI.updateReactionTimer(ratio);
+      if (elapsed >= this.duration) {
+        this.resolveTimeout();
+        return;
+      }
       this.animFrame = requestAnimationFrame(() => this.tick());
     },
 
-    respond(panic) {
+    // Called by Trading methods after every trade
+    onTrade(tradeType) {
       if (!this.active || this.resolved) return;
-      if (navigator.vibrate) navigator.vibrate(12);
-      this.resolve(panic);
+      const smart = this.isSmartTrade(tradeType);
+      this.resolve(smart);
     },
 
-    resolve(panic) {
+    resolve(smart) {
       if (this.resolved) return;
       this.resolved = true;
       this.active = false;
       cancelAnimationFrame(this.animFrame);
 
-      if (panic === null) {
-        if (!this.isBoss && !this.isSec) Combo.onBreak();
-        UI.showQTEFeedback('TOO LATE', 'late');
-        setTimeout(() => UI.hideQTE(), 450);
-        UI.updateCombo();
-        if (this.isSec) SECRaid.resolve(false);
-        return;
-      }
-
-      const correct = this.isChoiceCorrect(panic, this.expected);
-
-      if (this.isSec) {
-        UI.showQTEFeedback(this.resultFeedback(panic, correct, this.expected, true), correct ? 'win' : 'lose');
-        setTimeout(() => {
-          UI.hideQTE();
-          SECRaid.resolve(correct);
-        }, correct ? 350 : 500);
-        return;
-      }
-
       const mult = (WaveState.qteBoost ? 2 : 1) * (this.isBoss ? 1.5 : 1) * Combo.mult();
 
-      if (correct) {
+      if (smart) {
         Combo.onWin();
         RunStats.qteWins++;
         WaveState.waveQTEWins++;
         const bonus = Math.min(Portfolio.value() * 0.02, Math.max(30, Portfolio.cash * 0.03)) * mult;
         Portfolio.cash += bonus;
         AudioEngine.play('qte_win');
-        UI.showQTEFeedback(this.resultFeedback(panic, true, this.expected, false, `+${Utils.formatMoney(bonus)}`), 'win');
+        UI.showReactionFeedback(`✓ +${Utils.formatMoney(bonus)}`, 'win');
         if (RunStats.qteWins >= 5) Achievements.unlock('quick_fingers', Meta.data);
       } else {
         Combo.onBreak();
-        const penalty = Math.min(Portfolio.cash, Portfolio.value() * 0.02);
+        const penalty = Math.min(Portfolio.cash, Portfolio.value() * 0.015);
         Portfolio.cash = Math.max(0, Portfolio.cash - penalty);
         AudioEngine.play('qte_lose');
-        UI.showQTEFeedback(this.resultFeedback(panic, false, this.expected, false), 'lose');
+        UI.showReactionFeedback(`✗ -${Utils.formatMoney(penalty)}`, 'lose');
       }
       UI.updateCombo();
       UI.updatePortfolio();
-      setTimeout(() => UI.hideQTE(), correct ? 350 : 500);
+      setTimeout(() => UI.hideReactionBar(), 800);
+    },
+
+    resolveTimeout() {
+      if (this.resolved) return;
+      this.resolved = true;
+      this.active = false;
+      cancelAnimationFrame(this.animFrame);
+      Combo.onBreak();
+      const penalty = Math.min(Portfolio.cash, Portfolio.value() * 0.015);
+      Portfolio.cash = Math.max(0, Portfolio.cash - penalty);
+      AudioEngine.play('qte_lose');
+      UI.showReactionFeedback(`TOO SLOW -${Utils.formatMoney(penalty)}`, 'late');
+      UI.updateCombo();
+      UI.updatePortfolio();
+      setTimeout(() => UI.hideReactionBar(), 600);
+    },
+
+    cancel() {
+      this.active = false;
+      this.resolved = true;
+      cancelAnimationFrame(this.animFrame);
+      UI.hideReactionBar();
     },
   };
 
@@ -1046,7 +1042,8 @@
       if (frac <= 1) return Portfolio.cash * frac;
       return Portfolio.cash * Math.min(frac, Config.TRADE_SIZE_YOLO);
     },
-    afterTrade() {
+    afterTrade(type) {
+      QTE.onTrade(type);
       UI.updatePortfolio();
       UI.updateTradeButtons();
     },
@@ -1084,7 +1081,7 @@
       if (RunStats.fullSizeTrades >= 5) Achievements.unlock('all_in', Meta.data);
       if (spend >= 5000) Achievements.unlock('whale', Meta.data);
       if (Portfolio.shares > 0 && Portfolio.shortShares > 0) Achievements.unlock('hedge_lord', Meta.data);
-      this.afterTrade();
+      this.afterTrade('buy');
     },
     sell() {
       const frac = this.getTradeFraction();
@@ -1103,7 +1100,7 @@
       AudioEngine.play('sell'); UI.animateButton('sell-btn');
       UI.spawnFloatText(document.getElementById('sell-btn').parentElement, Utils.formatMoney(proceeds), true);
       this.log('sell', `SELL ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)}`, proceeds);
-      this.afterTrade();
+      this.afterTrade('sell');
     },
     short() {
       const frac = this.getTradeFraction();
@@ -1121,7 +1118,7 @@
       AudioEngine.play('short'); UI.animateButton('short-btn');
       this.log('short', `SHORT ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)}`);
       Achievements.unlock('first_trade', Meta.data);
-      this.afterTrade();
+      this.afterTrade('short');
     },
     cover() {
       const frac = this.getTradeFraction();
@@ -1137,7 +1134,7 @@
       if (pnl > 0) { WaveState.waveShortProfit = true; Achievements.unlock('short_king', Meta.data); }
       AudioEngine.play('cover'); UI.animateButton('cover-btn');
       this.log('cover', `COVER ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)}`, pnl);
-      this.afterTrade();
+      this.afterTrade('cover');
     },
     undo() {
       if (!Meta.has('ghost_portfolio') || this.undoUsed || !this.lastTrade) return;
@@ -1165,7 +1162,7 @@
         'trade-size-slider','trade-size-label','trade-size-chips','trade-log','trade-log-count',
         'trade-log-overlay','log-btn','close-log-btn','difficulty-badge',
         'chaos-points-badge','menu-chaos-points','menu-streak','menu-best-streak','upgrade-chaos-points',
-        'mute-btn','qte-prompt','qte-timer-bar','score-title','score-subtitle','score-peak',
+        'mute-btn','score-title','score-subtitle','score-peak',
         'score-trades','score-news','score-qte','score-chaos-earned','score-waves','score-goals',
         'score-streak-bonus','upgrades-list','achievements-list','achievement-toast-title',
         'achievement-toast-desc','setting-sound','setting-reduced-motion','setting-particles',
@@ -1176,7 +1173,8 @@
         'upgrades-owned-count','upgrades-total-count','achievements-unlocked-count',
         'achievements-total-count','sec-countdown','margin-timer-bar','retire-milestone-text',
         'retire-bonus','trade-status-hint','debug-overlay',
-        'regime-badge','combo-badge','session-pnl','qte-feedback','qte-backdrop','inter-wave-rank','qte-hint',
+        'regime-badge','combo-badge','session-pnl','inter-wave-rank',
+        'reaction-bar','reaction-label','reaction-timer-fill','reaction-feedback',
       ].forEach((id) => { this.els[id] = document.getElementById(id); });
     },
     show(id) { this.els[id]?.classList.remove('hidden'); },
@@ -1285,39 +1283,32 @@
       el.classList.remove('hidden');
     },
     hideNextNewsHint() { this.els['next-news-hint']?.classList.add('hidden'); },
-    showQTE(prompt, opts = {}) {
-      this.els['qte-prompt'].textContent = prompt;
-      this.els['qte-timer-bar'].style.width = '100%';
-      this.els['qte-feedback']?.classList.add('hidden');
-      const yesLabel = document.querySelector('#qte-yes .qte-btn-label');
-      const noLabel = document.querySelector('#qte-no .qte-btn-label');
-      const hint = this.els['qte-hint'];
-      if (opts.isSec) {
-        if (yesLabel) yesLabel.textContent = 'COMPLY';
-        if (noLabel) noLabel.textContent = 'LIE';
-        if (hint) hint.textContent = 'Space / tap left = COMPLY · N / → / tap right = LIE';
-      } else {
-        if (yesLabel) yesLabel.textContent = 'PANIC';
-        if (noLabel) noLabel.textContent = 'HODL';
-        if (hint) hint.textContent = 'Space / tap left = PANIC · N / → / tap right = HODL';
-      }
-      this.show('qte-overlay');
-      document.body.classList.add('qte-active');
-      requestAnimationFrame(() => document.getElementById('qte-yes')?.focus());
+    showReactionBar(label, barClass, gridClass) {
+      const bar = this.els['reaction-bar'];
+      if (!bar) return;
+      bar.className = `reaction-bar ${barClass}`;
+      if (this.els['reaction-label']) this.els['reaction-label'].textContent = label;
+      if (this.els['reaction-timer-fill']) this.els['reaction-timer-fill'].style.width = '100%';
+      if (this.els['reaction-feedback']) this.els['reaction-feedback'].textContent = '';
+      const grid = document.querySelector('.trade-buttons-grid');
+      if (grid) grid.className = `trade-buttons-grid ${gridClass}`;
     },
-    updateQTETimer(r) { this.els['qte-timer-bar'].style.width = `${r * 100}%`; },
-    showQTEFeedback(text, cls) {
-      const el = this.els['qte-feedback'];
+    updateReactionTimer(r) {
+      if (this.els['reaction-timer-fill']) this.els['reaction-timer-fill'].style.width = `${r * 100}%`;
+    },
+    showReactionFeedback(text, cls) {
+      const el = this.els['reaction-feedback'];
       if (!el) return;
       el.textContent = text;
-      el.className = `qte-feedback ${cls}`;
-      el.classList.remove('hidden');
+      el.className = `reaction-feedback ${cls}`;
     },
-    hideQTE() {
-      this.hide('qte-overlay');
-      document.body.classList.remove('qte-active');
-      this.els['qte-feedback']?.classList.add('hidden');
+    hideReactionBar() {
+      const bar = this.els['reaction-bar'];
+      if (bar) bar.className = 'reaction-bar hidden';
+      const grid = document.querySelector('.trade-buttons-grid');
+      if (grid) grid.className = 'trade-buttons-grid';
     },
+    hideQTE() { this.hideReactionBar(); },
     updateRegime() {
       const el = this.els['regime-badge'];
       if (!el) return;
@@ -1499,13 +1490,6 @@
 
     handleKeydown(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (QTE.active && !QTE.resolved) {
-        const panicKeys = [' ', 'ArrowLeft', 'a', 'A', 'y', 'Y'];
-        const hodlKeys = ['ArrowRight', 'n', 'N', 'd', 'D'];
-        if (panicKeys.includes(e.key)) { e.preventDefault(); QTE.respond(true); return; }
-        if (hodlKeys.includes(e.key)) { e.preventDefault(); QTE.respond(false); return; }
-        return;
-      }
       if (!this.running || this.gameOver || this.paused || WaveState.intermission) return;
       const tradeMap = { '1': 'buy', 'q': 'buy', 'Q': 'buy', '2': 'sell', 'w': 'sell', 'W': 'sell', '3': 'short', 'e': 'short', 'E': 'short', '4': 'cover', 'r': 'cover', 'R': 'cover' };
       if (tradeMap[e.key]) { e.preventDefault(); this.trade(tradeMap[e.key]); return; }
@@ -1519,6 +1503,7 @@
       if (SECRaid.active) return 'SEC RAID';
       if (this.marginCallActive) return 'MARGIN CALL';
       if (this.tradingFrozen) return 'FROZEN';
+      // QTE.active is NOT a trade block — trades are how you respond
       return '';
     },
     canTrade() {
@@ -1619,9 +1604,7 @@
         Trading.tradeSizeIndex = parseInt(e.target.value, 10);
         UI.updateTradeChips();
       });
-      document.getElementById('qte-yes').addEventListener('click', (e) => { e.stopPropagation(); QTE.respond(true); });
-      document.getElementById('qte-no').addEventListener('click', (e) => { e.stopPropagation(); QTE.respond(false); });
-      document.getElementById('qte-backdrop')?.addEventListener('click', () => {});
+      // QTE buttons removed — reaction now via buy/sell/short/cover
       document.getElementById('keep-trading-btn').addEventListener('click', () => this.continueRun());
       document.getElementById('cash-out-btn').addEventListener('click', () => this.cashOut());
       document.getElementById('wave-shop-items').addEventListener('click', (e) => {
@@ -1643,7 +1626,7 @@
           this.debug = !this.debug;
           UI.els['debug-overlay']?.classList.toggle('hidden', !this.debug);
         }
-        if (e.key === 'Escape' && this.running && !this.gameOver && !WaveState.intermission && !QTE.active) this.togglePause();
+        if (e.key === 'Escape' && this.running && !this.gameOver && !WaveState.intermission) this.togglePause();
         this.handleKeydown(e);
       });
       } catch (err) {
@@ -1706,8 +1689,8 @@
       WaveState.qteBoost = false;
       WaveState.retiredMilestones = new Set();
 
-      News.clear(); QTE.active = false; QTE.resolved = true;
-      UI.hideQTE(); UI.hide('main-menu'); UI.hide('score-overlay');
+      News.clear(); QTE.cancel();
+      UI.hide('main-menu'); UI.hide('score-overlay');
       UI.hide('pause-overlay'); UI.hide('intermission-overlay'); UI.hide('retire-overlay');
       UI.hide('margin-overlay'); UI.show('game-ui');
       document.body.classList.add('game-active');
@@ -1938,7 +1921,7 @@
     },
 
     togglePause() {
-      if (!this.running || this.gameOver || WaveState.intermission || QTE.active) return;
+      if (!this.running || this.gameOver || WaveState.intermission) return;
       this.paused = !this.paused;
       if (this.paused) UI.show('pause-overlay'); else UI.hide('pause-overlay');
       UI.updateTradeButtons();
