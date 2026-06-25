@@ -155,27 +155,6 @@
     </div>
   </div>
 
-  <!-- QTE -->
-  <div id="qte-overlay" class="qte-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="qte-prompt">
-    <div id="qte-backdrop" class="qte-backdrop"></div>
-    <div class="qte-panel">
-      <p id="qte-prompt" class="qte-prompt">PANIC SELL?</p>
-      <p id="qte-feedback" class="qte-feedback hidden"></p>
-      <div class="qte-button-row">
-        <button id="qte-yes" type="button" class="qte-btn qte-panic">
-          <span class="qte-btn-label">PANIC</span>
-          <span class="qte-btn-key">Space</span>
-        </button>
-        <button id="qte-no" type="button" class="qte-btn qte-hodl">
-          <span class="qte-btn-label">HODL</span>
-          <span class="qte-btn-key">N / →</span>
-        </button>
-      </div>
-      <div class="qte-timer-track"><div id="qte-timer-bar" class="qte-timer-fill" style="width:100%"></div></div>
-      <p class="qte-hint" id="qte-hint">Tap left or Space = PANIC · Tap right or N = HODL</p>
-    </div>
-  </div>
-
   <!-- Score screen -->
   <div id="score-overlay" class="overlay-screen fixed inset-0 z-[100] flex items-center justify-center bg-black/92 backdrop-blur-sm hidden overflow-y-auto py-6">
     <div class="w-full max-w-lg px-6">
@@ -284,6 +263,13 @@
       </div>
 
       <div id="trading-frozen" class="game-frozen hidden">⛔ TRADING FROZEN</div>
+      <div id="reaction-bar" class="reaction-bar hidden" aria-live="polite">
+        <div class="reaction-bar-inner">
+          <span id="reaction-label" class="reaction-label">⚡ REACT</span>
+          <div class="reaction-timer-track"><div id="reaction-timer-fill" class="reaction-timer-fill"></div></div>
+          <span id="reaction-feedback" class="reaction-feedback"></span>
+        </div>
+      </div>
 
       <div class="game-chart-area">
         <div id="chart-container" class="chart-container">
