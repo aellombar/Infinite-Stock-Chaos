@@ -1,7 +1,13 @@
 (() => {
   'use strict';
 
-  // Balance tuned v4 — regimes, news pool, combos
+  /* Config v5 — balance knobs
+   * SPREAD_BPS 8 + TRADE_FEE $2 per side | slippage >25% portfolio: size*0.15%
+   * Overtrade: >4 trades/10s → 0.5% portfolio per extra | short borrow 0.02%/30s
+   * Bear drift -0.12%/s | mean reversion ±15% | goal miss -2%
+   * Wave scale: +8% mag, +5% fake (cap 45%), +2 bps fees/wave
+   * Skilled wave 3: $1.5k-3k | great run $6k-8k | 5 base waves + NG+ 6-10
+   */
   const Config = {
     START_CASH: 1000,
     START_PRICE: 100,
@@ -12,19 +18,49 @@
     TRADE_SIZES: [0.25, 0.5, 0.75, 1.0],
     TRADE_SIZE_YOLO: 1.2,
     QTE_DURATION: 2000,
-    STORAGE_KEY: 'isc_meta_v2',
+    STORAGE_KEY: 'isc_meta_v3',
     TOTAL_WAVES: 5,
+    NG_PLUS_MAX_WAVE: 10,
     WAVE_DURATION_BASE: 75000,
     WAVE_DURATION_STEP: 3750,
+    NG_WAVE_DURATION_START: 55000,
+    NG_WAVE_DURATION_END: 40000,
     MARGIN_CALL_THRESHOLD: 0.6,
     MARGIN_CALL_TIME: 8000,
+    MARGIN_DEBT_LIMIT: -0.15,
+    MARGIN_DEBT_RATE: 0.001,
     MAX_CRASH_MAGNITUDE: 0.35,
+    MAX_MOON_MAGNITUDE: 0.64,
     HEADLINE_REPEAT_COOLDOWN: 25,
     PROCEDURAL_NEWS_CHANCE: 0.4,
     REGIME_DURATION_MIN: 15000,
     REGIME_DURATION_MAX: 30000,
-    MEAN_REVERSION_STRENGTH: 0.00012,
+    MEAN_REVERSION_STRENGTH: 0.00018,
+    MEAN_REVERSION_THRESHOLD: 0.15,
+    BEAR_DRIFT: -0.12,
     COMBO_MAX: 3,
+    SPREAD_BPS: 8,
+    TRADE_FEE: 2,
+    SLIPPAGE_THRESHOLD: 0.25,
+    SLIPPAGE_RATE: 0.0015,
+    OVERTRADE_WINDOW_MS: 10000,
+    OVERTRADE_MAX: 4,
+    OVERTRADE_PENALTY: 0.005,
+    SHORT_BORROW_RATE: 0.0002,
+    SHORT_BORROW_INTERVAL: 30000,
+    GOAL_MISS_PENALTY: 0.02,
+    WAVE_MAG_SCALE: 0.08,
+    WAVE_FAKE_SCALE: 0.05,
+    WAVE_FAKE_CAP: 0.45,
+    WAVE_FEE_BPS_SCALE: 2,
+    HEAT_DECAY_PER_MIN: 5,
+    HEAT_SEC_BOOST: 1.5,
+    HEAT_FINE_MULT: 2,
+    HEAT_TRADE_THRESHOLD: 0.5,
+    HEAT_TRADE_AMOUNT: 8,
+    ENDLESS_UNLOCK_CP: 500,
+    ENDLESS_NEWS_ACCEL: 60000,
+    WASH_SALE_FREE_TRADES: 3,
     RETIRE_MILESTONES: [
       { amount: 5000, bonus: 40 },
       { amount: 10000, bonus: 100 },
@@ -37,7 +73,7 @@
       nightmare: { label: 'NIGHTMARE', newsMin: 3000, newsMax: 5000, magnitudeMult: 1.35, fakeChance: 0.35, badgeClass: 'badge-nightmare' },
     },
 
-    WAVE_GOAL_IDS: ['survive_floor', 'shares_min', 'short_profit', 'qte_wins', 'no_sell_moon', 'profit_wave'],
+    WAVE_GOAL_IDS: ['survive_floor', 'shares_min', 'short_profit', 'qte_wins', 'no_sell_moon', 'profit_wave', 'no_overtrade', 'min_reaction_wins', 'max_drawdown'],
 
     WAVE_SHOP: [
       { id: 'news_shield', name: 'News Shield', desc: 'Block next headline effect', cost: 25 },
@@ -84,6 +120,57 @@
       { headline: '👹 BOSS: Short Squeeze Armageddon', type: 'moon', magnitude: [0.60, 0.90], boss: true },
       { headline: '👹 BOSS: The Fed Goes Live on Twitch', type: 'massive_crash', magnitude: [0.55, 0.80], boss: true },
     ],
+    MINI_BOSS_EVENTS: [
+      { headline: '⚡ MINI-BOSS: Flash Crash Flashback', type: 'crash', magnitude: [0.28, 0.42], miniBoss: true },
+      { headline: '⚡ MINI-BOSS: Gamma Squeeze Lite', type: 'surge', magnitude: [0.25, 0.38], miniBoss: true },
+    ],
+    ASCENDED_EVENTS: [
+      { headline: '🔮 ASCENDED: Fed whispers "higher for longer" into your portfolio', type: 'massive_crash', magnitude: [0.45, 0.65] },
+      { headline: '🔮 ASCENDED: Retail discovers options same day as earnings', type: 'moon', magnitude: [0.50, 0.75] },
+      { headline: '🔮 ASCENDED: Treasury yield curve inverts again, again', type: 'crash', magnitude: [0.30, 0.50] },
+      { headline: '🔮 ASCENDED: Meme ETF launches with your ticker only', type: 'moon', magnitude: [0.55, 0.80] },
+      { headline: '🔮 ASCENDED: AI hedge fund goes rogue on Twitter', type: 'surge', magnitude: [0.35, 0.55] },
+      { headline: '🔮 ASCENDED: Sovereign wealth fund YOLOs pre-market', type: 'moon', magnitude: [0.40, 0.70] },
+      { headline: '🔮 ASCENDED: Circuit breakers fail open', type: 'massive_crash', magnitude: [0.50, 0.70] },
+      { headline: '🔮 ASCENDED: Short interest reported as "yes"', type: 'moon', magnitude: [0.45, 0.65] },
+      { headline: '🔮 ASCENDED: Dark pool leaks to Reddit before open', type: 'surge', magnitude: [0.30, 0.50] },
+      { headline: '🔮 ASCENDED: CEO livestreams margin call', type: 'crash', magnitude: [0.35, 0.55] },
+      { headline: '🔮 ASCENDED: Basel III accidentally applies to memes', type: 'massive_crash', magnitude: [0.40, 0.60] },
+      { headline: '🔮 ASCENDED: Whale tweets single emoji, market obeys', type: 'moon', magnitude: [0.50, 0.85] },
+      { headline: '🔮 ASCENDED: Volatility index becomes sentient', type: 'crash', magnitude: [0.25, 0.45] },
+      { headline: '🔮 ASCENDED: Exchange halts trading, price doesn\'t care', type: 'surge', magnitude: [0.20, 0.40] },
+      { headline: '🔮 ASCENDED: Macro podcast moves $50B in 8 minutes', type: 'massive_crash', magnitude: [0.45, 0.65] },
+      { headline: '🔮 ASCENDED: Dividend announced in exposure', type: 'moon', magnitude: [0.35, 0.55] },
+      { headline: '🔮 ASCENDED: Algo reads sarcasm wrong, rips 40%', type: 'surge', magnitude: [0.30, 0.48] },
+      { headline: '🔮 ASCENDED: Central bank buys your competitor instead', type: 'crash', magnitude: [0.28, 0.48] },
+      { headline: '🔮 ASCENDED: Options market makers go on strike', type: 'moon', magnitude: [0.55, 0.75] },
+      { headline: '🔮 ASCENDED: Flash loan attack on your cap table', type: 'massive_crash', magnitude: [0.50, 0.68] },
+      { headline: '🔮 ASCENDED: Influencer fund liquidates into your stock', type: 'moon', magnitude: [0.45, 0.70] },
+      { headline: '🔮 ASCENDED: CPI print leaked via Discord', type: 'crash', magnitude: [0.32, 0.52] },
+      { headline: '🔮 ASCENDED: Quantum computer predicts your earnings wrong', type: 'surge', magnitude: [0.25, 0.42] },
+      { headline: '🔮 ASCENDED: Sovereign default priced into your P/E', type: 'massive_crash', magnitude: [0.42, 0.62] },
+      { headline: '🔮 ASCENDED: Meme coin merges with your equity', type: 'moon', magnitude: [0.60, 0.90] },
+      { headline: '🔮 ASCENDED: Market maker fat-fingers 9 extra zeros', type: 'surge', magnitude: [0.35, 0.55] },
+      { headline: '🔮 ASCENDED: Rating agency downgrades "vibes"', type: 'crash', magnitude: [0.30, 0.50] },
+      { headline: '🔮 ASCENDED: Passive flows accidentally go active', type: 'moon', magnitude: [0.40, 0.65] },
+      { headline: '🔮 ASCENDED: Liquidity evaporates mid-trade', type: 'massive_crash', magnitude: [0.48, 0.72] },
+      { headline: '🔮 ASCENDED: The Fed holds press conference in your chart', type: 'massive_crash', magnitude: [0.55, 0.80], boss: true, fedBoss: true },
+    ],
+    SECTORS: {
+      meme: { id: 'meme', label: 'MEME', moonMult: 1.25, fakeMult: 1.35, volMult: 1.4, feeMult: 1.0, crashWeight: 1.0 },
+      bluechip: { id: 'bluechip', label: 'BLUE CHIP', moonMult: 0.8, fakeMult: 0.75, volMult: 0.75, feeMult: 0.85, crashWeight: 1.15 },
+      biotech: { id: 'biotech', label: 'BIOTECH', moonMult: 1.4, fakeMult: 1.0, volMult: 1.8, feeMult: 1.0, crashWeight: 1.2, bossMult: 2.0 },
+    },
+    MODIFIER_POOL: [
+      { id: 'double_fees', label: 'Double Fees', desc: 'All trade fees ×2', icon: '💸' },
+      { id: 'news_x15', label: 'News ×1.5', desc: 'Headline magnitude +50%', icon: '📰' },
+      { id: 'reaction_bonus', label: 'Reaction+', desc: '+50% reaction window bonus', icon: '⚡' },
+      { id: 'shorts_banned', label: 'Shorts Banned', desc: 'Cannot open new shorts', icon: '🚫' },
+      { id: 'volatility_x2', label: 'Vol ×2', desc: 'Market volatility doubled', icon: '🌪️' },
+      { id: 'fee_rebate', label: 'Fee Rebate', desc: 'Spread −4 bps this run', icon: '🎫' },
+      { id: 'heat_magnet', label: 'Heat Magnet', desc: 'Heat rises 50% faster', icon: '🔥' },
+      { id: 'calm_markets', label: 'Calm Markets', desc: 'News 20% slower', icon: '😴' },
+    ],
 
     UPGRADES: [
       { id: 'thick_skin', name: 'Thick Skin', desc: 'Start each run with +$500 cash', cost: 50 },
@@ -104,6 +191,12 @@
       { id: 'rug_pull_insurance', name: 'Rug Pull Insurance', desc: 'First crash each run capped at -20%', cost: 115 },
       { id: 'vibe_analyst', name: 'Vibe Analyst', desc: 'Noisy sentiment meter (often wrong)', cost: 55 },
       { id: 'exit_liquidity', name: 'Exit Liquidity', desc: 'Cash Out gives +15% CP bonus', cost: 100 },
+      { id: 'wash_sale_waiver', name: 'Wash Sale Waiver', desc: 'First 3 trades/wave fee-free', cost: 150 },
+      { id: 'sector_insider', name: 'Sector Insider', desc: 'See sector bias in regime badge', cost: 175 },
+      { id: 'heat_shield', name: 'Heat Shield', desc: 'Heat decays 2× faster', cost: 200 },
+      { id: 'ascension_key', name: 'Ascension Key', desc: 'Start NG+ at wave 6 from menu', cost: 250 },
+      { id: 'fee_fighter', name: 'Fee Fighter', desc: 'Spread −4 bps permanently', cost: 180 },
+      { id: 'debt_jubilee', name: 'Debt Jubilee', desc: 'Clear margin debt once per run', cost: 300 },
     ],
 
     ACHIEVEMENTS: [
@@ -134,6 +227,14 @@
       { id: 'shopaholic', name: 'Shopaholic', desc: 'Buy 3 mid-run shop items in one run', hint: 'Spend CP mid-run' },
       { id: 'streak_master', name: 'Streak Master', desc: 'Reach a 5 win streak', hint: 'Cash out 5 times in a row' },
       { id: 'victory_lap', name: 'Victory Lap', desc: 'Retire early at $25k milestone', hint: 'Retire as legend' },
+      { id: 'endless_survivor', name: 'Endless Survivor', desc: 'Survive 5 minutes in Endless mode', hint: 'Endless Chaos 5min+' },
+      { id: 'ng_plus_clear', name: 'Ascended', desc: 'Clear NG+ wave 10', hint: 'Beat The Fed boss' },
+      { id: 'zero_fee_wave', name: 'Fee Dodger', desc: 'Complete a wave with ≤$5 total fees', hint: 'Trade smart, not often' },
+      { id: 'heat_100_survived', name: 'Too Hot', desc: 'Survive with heat at 100', hint: 'Live on the edge' },
+      { id: 'sector_master', name: 'Sector Master', desc: 'Clear wave 5 on each sector', hint: 'Meme, Blue Chip, Biotech' },
+      { id: 'modifier_stack', name: 'Cursed Run', desc: 'Win with 2 modifiers active', hint: 'Double modifier victory' },
+      { id: 'no_churn_wave', name: 'Patient Trader', desc: 'Hit no_overtrade goal', hint: '≤8 trades in a wave' },
+      { id: 'debt_free', name: 'Debt Free', desc: 'Clear wave 5 with zero margin debt', hint: 'Stay solvent' },
     ],
   };
 
@@ -188,7 +289,7 @@
       twist: ['stock rips anyway', 'markets unphased', 'analysts baffled', 'shorts in shambles', 'retail celebrates', 'SEC opens probe', 'non-apology issued', 'emergency board meeting', 'CEO doubles down', 'memes take credit', 'logic inverted', 'volume hits record', 'price does opposite', 'cope posted then deleted', 'lawyers involved', 'thread goes viral'],
     },
     typeCycle: ['crash', 'surge', 'moon', 'massive_crash'],
-    mags: { crash: [0.18, 0.38], surge: [0.12, 0.28], moon: [0.22, 0.48], massive_crash: [0.35, 0.55] },
+    mags: { crash: [0.20, 0.40], surge: [0.12, 0.28], moon: [0.18, 0.38], massive_crash: [0.38, 0.58] },
 
     init() {
       this.pool = [...Config.NEWS_EVENTS];
@@ -224,8 +325,17 @@
     },
 
     pickEvent(wave) {
-      if (wave === 3 || wave === 5) {
+      if (NGPlus.isAscendedWave() && Utils.rand(0, 1) < 0.4) {
+        return Config.ASCENDED_EVENTS[Utils.randInt(0, Config.ASCENDED_EVENTS.length - 1)];
+      }
+      if (wave === 4 && Utils.rand(0, 1) < 0.4) {
+        return Config.MINI_BOSS_EVENTS[Utils.randInt(0, Config.MINI_BOSS_EVENTS.length - 1)];
+      }
+      if (wave === 3 || wave === 5 || (NGPlus.active && wave === 10)) {
         if (Utils.rand(0, 1) < 0.35) {
+          if (NGPlus.active && wave === 10) {
+            return Config.ASCENDED_EVENTS.find((e) => e.fedBoss) || Config.BOSS_EVENTS[2];
+          }
           const bosses = Config.BOSS_EVENTS.filter((b) => !(wave === 5 && b.headline.includes('Meltdown')));
           return bosses[Utils.randInt(0, bosses.length - 1)] || Config.BOSS_EVENTS[0];
         }
@@ -253,20 +363,255 @@
   const Storage = {
     load() {
       try {
-        const raw = localStorage.getItem(Config.STORAGE_KEY) || localStorage.getItem('isc_meta_v1');
+        const raw = localStorage.getItem(Config.STORAGE_KEY)
+          || localStorage.getItem('isc_meta_v2')
+          || localStorage.getItem('isc_meta_v1');
         if (!raw) return Storage.defaultData();
-        return { ...Storage.defaultData(), ...JSON.parse(raw) };
+        const parsed = JSON.parse(raw);
+        const data = { ...Storage.defaultData(), ...parsed };
+        if (!data.endlessBest) data.endlessBest = { portfolio: 0, time: 0 };
+        if (data.ngPlusClears === undefined) data.ngPlusClears = 0;
+        if (!data.dailyLastPlayed) data.dailyLastPlayed = '';
+        if (!data.sectorsCleared) data.sectorsCleared = {};
+        if (!data.ascensionKeyStart) data.ascensionKeyStart = false;
+        if (localStorage.getItem('isc_meta_v2') && !localStorage.getItem(Config.STORAGE_KEY)) {
+          Storage.save(data);
+        }
+        return data;
       } catch { return Storage.defaultData(); }
     },
     defaultData() {
       return {
         chaosPoints: 0, upgrades: {}, achievements: [],
         settings: { sound: true, reducedMotion: false, particles: true },
-        selectedDifficulty: 'normal', dailySeed: false,
+        selectedDifficulty: 'normal', dailySeed: false, endlessMode: false,
         winStreak: 0, bestStreak: 0, retiredMilestones: [],
+        endlessBest: { portfolio: 0, time: 0 },
+        ngPlusClears: 0, dailyLastPlayed: '', sectorsCleared: {},
+        ascensionKeyStart: false, selectedSector: 'meme',
       };
     },
     save(data) { localStorage.setItem(Config.STORAGE_KEY, JSON.stringify(data)); },
+  };
+
+  const Sectors = {
+    current: null,
+    pick(id) { this.current = Config.SECTORS[id] || Config.SECTORS.meme; return this.current; },
+    get() { return this.current || Config.SECTORS.meme; },
+    applyNewsMag(type, mag) {
+      const s = this.get();
+      if (Utils.isBullish(type)) return Math.min(mag * s.moonMult, Config.MAX_MOON_MAGNITUDE);
+      if (Utils.isBearish(type)) return mag * s.crashWeight;
+      return mag;
+    },
+    getVolMult() { return this.get().volMult; },
+    getFakeMult() { return this.get().fakeMult; },
+    getFeeMult() { return this.get().feeMult; },
+    getBossMult() { return this.get().bossMult || 1; },
+    getBiasLabel() {
+      const s = this.get();
+      if (s.id === 'meme') return 'MEME BIAS: volatile pumps';
+      if (s.id === 'bluechip') return 'BLUE CHIP: steady, lower fees';
+      return 'BIOTECH: binary swings';
+    },
+  };
+
+  const Fees = {
+    sessionTotal: 0,
+    waveTotal: 0,
+    waveFreeTrades: 0,
+    tradeTimestamps: [],
+    lastBorrowTick: 0,
+    debtJubileeUsed: false,
+
+    reset() {
+      this.sessionTotal = 0;
+      this.waveTotal = 0;
+      this.waveFreeTrades = 0;
+      this.tradeTimestamps = [];
+      this.lastBorrowTick = performance.now();
+      this.debtJubileeUsed = false;
+    },
+    resetWave() {
+      this.waveTotal = 0;
+      this.waveFreeTrades = 0;
+    },
+    getSpreadBps() {
+      let bps = Config.SPREAD_BPS + (WaveState.current - 1) * Config.WAVE_FEE_BPS_SCALE;
+      if (Meta.has('fee_fighter')) bps -= 4;
+      if (Modifiers.has('fee_rebate')) bps -= 4;
+      if (Modifiers.has('double_fees')) bps *= 2;
+      bps *= Sectors.getFeeMult();
+      if (NGPlus.active && WaveState.current >= 10) bps *= 3;
+      else if (NGPlus.active) bps *= 1 + (WaveState.current - 5) * 0.1;
+      return Math.max(1, bps);
+    },
+    calcTradeCost(notional, sizeFraction) {
+      let cost = notional * (this.getSpreadBps() / 10000) + Config.TRADE_FEE;
+      if (sizeFraction > Config.SLIPPAGE_THRESHOLD) {
+        cost += notional * sizeFraction * Config.SLIPPAGE_RATE;
+      }
+      const now = performance.now();
+      this.tradeTimestamps = this.tradeTimestamps.filter((t) => now - t < Config.OVERTRADE_WINDOW_MS);
+      if (this.tradeTimestamps.length >= Config.OVERTRADE_MAX) {
+        const extras = this.tradeTimestamps.length - Config.OVERTRADE_MAX + 1;
+        cost += Portfolio.value() * Config.OVERTRADE_PENALTY * extras;
+      }
+      if (Meta.has('wash_sale_waiver') && this.waveFreeTrades < Config.WASH_SALE_FREE_TRADES) {
+        return 0;
+      }
+      return cost;
+    },
+    recordTrade(cost) {
+      const now = performance.now();
+      this.tradeTimestamps.push(now);
+      this.sessionTotal += cost;
+      this.waveTotal += cost;
+      if (Meta.has('wash_sale_waiver') && cost === 0) this.waveFreeTrades++;
+      if (this.tradeTimestamps.length > Config.OVERTRADE_MAX) {
+        UI.showChurningHint(true);
+      } else {
+        UI.showChurningHint(false);
+      }
+    },
+    applyBorrowCost(dt) {
+      if (Portfolio.shortShares <= 0) return 0;
+      this.lastBorrowTick += dt;
+      if (this.lastBorrowTick < Config.SHORT_BORROW_INTERVAL) return 0;
+      this.lastBorrowTick = 0;
+      const cost = Portfolio.value() * Config.SHORT_BORROW_RATE;
+      Portfolio.cash -= cost;
+      this.sessionTotal += cost;
+      return cost;
+    },
+    applyMarginDebt(dt) {
+      if (Portfolio.cash >= 0 || WaveState.current < 3) return 0;
+      const interest = Math.abs(Portfolio.cash) * Config.MARGIN_DEBT_RATE * (dt / 1000);
+      Portfolio.cash -= interest;
+      this.sessionTotal += interest;
+      return interest;
+    },
+    useDebtJubilee() {
+      if (!Meta.has('debt_jubilee') || this.debtJubileeUsed || Portfolio.cash >= 0) return false;
+      Portfolio.cash = 0;
+      this.debtJubileeUsed = true;
+      return true;
+    },
+  };
+
+  const Heat = {
+    value: 0,
+    maxed: false,
+    add(amount) {
+      this.value = Math.min(100, this.value + amount);
+      if (this.value >= 100 && !this.maxed) {
+        this.maxed = true;
+        Achievements.unlock('heat_100_survived', Meta.data);
+      }
+    },
+    onTrade(sizeFraction) {
+      if (sizeFraction >= Config.HEAT_TRADE_THRESHOLD) this.add(Config.HEAT_TRADE_AMOUNT);
+      if (Modifiers.has('heat_magnet')) this.add(Config.HEAT_TRADE_AMOUNT * 0.5);
+    },
+    onSecSurvive() { this.add(15); },
+    onFakeProfit() { this.add(12); },
+    decay(dt) {
+      const rate = Meta.has('heat_shield') ? Config.HEAT_DECAY_PER_MIN * 2 : Config.HEAT_DECAY_PER_MIN;
+      this.value = Math.max(0, this.value - rate * (dt / 60000));
+    },
+    getSecMult() { return this.value > 70 ? Config.HEAT_SEC_BOOST : 1; },
+    getFineMult() { return this.value > 70 ? Config.HEAT_FINE_MULT : 1; },
+    reset() { this.value = 0; this.maxed = false; },
+  };
+
+  const Modifiers = {
+    active: [],
+    pendingDraft: null,
+    maxStack: 2,
+    has(id) { return this.active.some((m) => m.id === id); },
+    get(id) { return this.active.find((m) => m.id === id); },
+    draftOptions() {
+      const available = Config.MODIFIER_POOL.filter((m) => !this.has(m.id));
+      const pool = available.length >= 3 ? available : Config.MODIFIER_POOL;
+      const picks = [];
+      const copy = [...pool];
+      while (picks.length < 3 && copy.length) {
+        const i = Utils.randInt(0, copy.length - 1);
+        picks.push(copy.splice(i, 1)[0]);
+      }
+      return picks;
+    },
+    apply(mod) {
+      if (this.active.length >= this.maxStack) return false;
+      if (this.has(mod.id)) return false;
+      this.active.push(mod);
+      return true;
+    },
+    reset() { this.active = []; this.pendingDraft = null; },
+    getLabels() { return this.active.map((m) => m.label); },
+    getReactionMult() { return this.has('reaction_bonus') ? 1.5 : 1; },
+    getNewsMult() { return this.has('news_x15') ? 1.5 : 1; },
+    getVolMult() { return this.has('volatility_x2') ? 2 : 1; },
+    shortsBanned() { return this.has('shorts_banned'); },
+  };
+
+  const NGPlus = {
+    active: false,
+    ascended: false,
+    reset() { this.active = false; this.ascended = false; },
+    start() { this.active = true; this.ascended = true; },
+    getTotalWaves() { return this.active ? Config.NG_PLUS_MAX_WAVE : Config.TOTAL_WAVES; },
+    isAscendedWave() { return this.active && WaveState.current >= 6; },
+    getWaveDuration(wave) {
+      if (!this.active || wave <= Config.TOTAL_WAVES) {
+        return Config.WAVE_DURATION_BASE - (wave - 1) * Config.WAVE_DURATION_STEP;
+      }
+      const ngWave = wave - Config.TOTAL_WAVES;
+      const span = Config.NG_WAVE_DURATION_START - Config.NG_WAVE_DURATION_END;
+      return Config.NG_WAVE_DURATION_START - (span / 4) * (ngWave - 1);
+    },
+  };
+
+  const EndlessMode = {
+    active: false,
+    elapsed: 0,
+    marginCalls: 0,
+    newsAccelLevel: 0,
+    baseNewsMin: 5000,
+    baseNewsMax: 9000,
+    isUnlocked(meta) {
+      return (meta.ngPlusClears >= 1) || (meta.chaosPoints >= Config.ENDLESS_UNLOCK_CP);
+    },
+    start() {
+      this.active = true;
+      this.elapsed = 0;
+      this.marginCalls = 0;
+      this.newsAccelLevel = 0;
+    },
+    reset() { this.active = false; this.elapsed = 0; this.marginCalls = 0; this.newsAccelLevel = 0; },
+    update(dt) {
+      if (!this.active) return;
+      this.elapsed += dt;
+      const newLevel = Math.floor(this.elapsed / Config.ENDLESS_NEWS_ACCEL);
+      if (newLevel > this.newsAccelLevel) this.newsAccelLevel = newLevel;
+    },
+    getNewsDelay() {
+      const shrink = this.newsAccelLevel * 0.12;
+      const min = Math.max(1500, this.baseNewsMin * (1 - shrink));
+      const max = Math.max(2500, this.baseNewsMax * (1 - shrink));
+      return Utils.rand(min, max);
+    },
+    recordMarginCall() {
+      this.marginCalls++;
+      if (this.marginCalls >= 3) return true;
+      return false;
+    },
+    checkBest(meta, portfolio) {
+      if (portfolio > (meta.endlessBest?.portfolio || 0)) {
+        meta.endlessBest = { portfolio, time: this.elapsed };
+        Storage.save(meta);
+      }
+    },
   };
 
   const AudioEngine = {
@@ -530,7 +875,7 @@
     waveAnchorPrice: Config.START_PRICE, regime: 'chop', regimeEnd: 0,
     regimes: {
       bull: { label: 'RISK-ON', drift: 0.06, volMult: 0.85 },
-      bear: { label: 'RISK-OFF', drift: -0.07, volMult: 1.0 },
+      bear: { label: 'RISK-OFF', drift: Config.BEAR_DRIFT, volMult: 1.0 },
       chop: { label: 'CHOPPY', drift: 0, volMult: 1.15 },
       mania: { label: 'UNHINGED', drift: 0, volMult: 1.8 },
     },
@@ -558,11 +903,11 @@
       const r = this.getRegime();
       const jitter = Utils.rand(-1, 1);
       const drift = (r.drift || 0) * (dt / 1000) / 100;
-      const vol = Config.BASE_VOLATILITY * (r.volMult || 1) * (dt / 1000) / 100;
+      const vol = Config.BASE_VOLATILITY * (r.volMult || 1) * Sectors.getVolMult() * Modifiers.getVolMult() * (dt / 1000) / 100;
       this.price *= 1 + drift + jitter * vol;
       const anchor = this.waveAnchorPrice || Config.START_PRICE;
       const deviation = (this.price - anchor) / anchor;
-      if (Math.abs(deviation) > 0.22) {
+      if (Math.abs(deviation) > Config.MEAN_REVERSION_THRESHOLD) {
         this.price *= 1 - deviation * Config.MEAN_REVERSION_STRENGTH * dt;
       }
     },
@@ -575,6 +920,7 @@
       let direction = Utils.isBullish(type) ? 1 : Utils.isBearish(type) ? -1 : 0;
       const intensity = type === 'massive_crash' ? 2.0 : type === 'moon' ? 1.6 : 1;
       let mag = this.activeNews.magnitude;
+      if (Utils.isBullish(type)) mag = Math.min(mag, Config.MAX_MOON_MAGNITUDE);
       if (Utils.isBearish(type)) {
         mag = Math.min(mag, Config.MAX_CRASH_MAGNITUDE);
         if (upgrades.crash_padding) mag *= 0.85;
@@ -668,6 +1014,7 @@
     bankrupt: false, wavesCleared: 0, goalsCompleted: 0, goalsTotal: 0,
     shopPurchases: 0, bossSurvived: false, secSurvived: false, dailyRun: false,
     waveReachedBeforeDeath: 0, flawless: true, cashOutProfit: 0,
+    sector: 'meme', reactionWins: 0, tradesLast10s: 0, ngPlusRun: false,
     reset(sc) {
       Object.assign(this, {
         startTime: performance.now(), peakPortfolio: sc, tradesMade: 0, newsSurvived: 0,
@@ -675,6 +1022,7 @@
         startCash: sc, bankrupt: false, wavesCleared: 0, goalsCompleted: 0, goalsTotal: 0,
         shopPurchases: 0, bossSurvived: false, secSurvived: false, dailyRun: false,
         waveReachedBeforeDeath: 0, flawless: true, cashOutProfit: 0,
+        sector: Sectors.get().id, reactionWins: 0, tradesLast10s: 0, ngPlusRun: false,
       });
     },
     updatePeak() {
@@ -687,7 +1035,8 @@
   const WaveState = {
     current: 1, duration: 75000, startTime: 0, goal: null, goalMet: false,
     waveStartPortfolio: 0, wavePeak: 0, waveTrades: 0, waveQTEWins: 0, waveShortProfit: false,
-    soldDuringMoon: false, qteBoost: false, intermission: false,
+    soldDuringMoon: false, qteBoost: false, intermission: false, pendingAscend: false,
+    modifierDraftShown: false, bossTelegraph: null,
     retiredMilestones: new Set(),
     resetWaveStats() {
       this.waveStartPortfolio = Portfolio.value();
@@ -723,6 +1072,9 @@
         qte_wins: 'Win 2 QTEs this wave',
         no_sell_moon: "Don't sell during a moon event",
         profit_wave: 'End wave richer than you started',
+        no_overtrade: 'Make ≤8 trades this wave',
+        min_reaction_wins: 'Land 2 smart reaction trades',
+        max_drawdown: 'Stay within 20% of wave peak',
       };
       return { id, label: labels[id], floor };
     },
@@ -735,10 +1087,16 @@
       if (id === 'qte_wins') return this.waveQTEWins >= 2;
       if (id === 'no_sell_moon') return !this.soldDuringMoon;
       if (id === 'profit_wave') return Portfolio.value() > this.waveStartPortfolio;
+      if (id === 'no_overtrade') return this.waveTrades <= 8;
+      if (id === 'min_reaction_wins') return this.waveQTEWins >= 2;
+      if (id === 'max_drawdown') {
+        const peak = this.wavePeak || Portfolio.value();
+        return peak <= 0 || Portfolio.value() >= peak * 0.8;
+      }
       return false;
     },
     getDuration() {
-      return Config.WAVE_DURATION_BASE - (this.current - 1) * Config.WAVE_DURATION_STEP;
+      return NGPlus.getWaveDuration(this.current);
     },
   };
 
@@ -747,17 +1105,27 @@
     schedule(game) {
       clearTimeout(this.timer);
       if (game.paused || game.gameOver || WaveState.intermission) return;
-      const diff = Market.getDiffConfig();
-      let delay = Utils.rand(diff.newsMin, diff.newsMax);
-      if (Meta.has('coffee_iv')) delay *= 1.1;
+      let delay;
+      if (EndlessMode.active) {
+        delay = EndlessMode.getNewsDelay();
+      } else {
+        const diff = Market.getDiffConfig();
+        delay = Utils.rand(diff.newsMin, diff.newsMax);
+        if (Meta.has('coffee_iv')) delay *= 1.1;
+        if (Modifiers.has('calm_markets')) delay *= 1.2;
+      }
       this.timer = setTimeout(() => this.trigger(game), delay);
     },
     pickEvent(wave) { return NewsGenerator.pickEvent(wave); },
     setNextPreview() {
       const ev = this.pickEvent(WaveState.current);
       this.nextEvent = ev;
-      if (ev.boss) {
-        UI.showNextNewsHint('⚠️ BOSS SIGNAL — brace for impact');
+      if (ev.boss || ev.miniBoss || ev.fedBoss) {
+        WaveState.bossTelegraph = ev;
+        UI.showNextNewsHint('👹 INCOMING — brace for impact');
+        setTimeout(() => {
+          if (WaveState.bossTelegraph === ev) UI.showNextNewsHint('⚠️ BOSS SIGNAL — brace for impact');
+        }, 3000);
       } else if (Meta.has('vpn_wallst')) {
         UI.showNextNewsHint(`$CHAO: ${Utils.codename()} · ${Utils.categoryLabel(ev.type)}`);
       }
@@ -770,14 +1138,23 @@
       NewsGenerator.remember(event.headline);
       const diff = Market.getDiffConfig();
       let magnitude = Utils.rand(event.magnitude[0], event.magnitude[1]) * diff.magnitudeMult;
-      magnitude *= 1 + (WaveState.current - 1) * 0.05;
-      const duration = event.boss ? Utils.rand(3000, 5000) : Utils.rand(2000, 4000);
+      magnitude *= 1 + (WaveState.current - 1) * Config.WAVE_MAG_SCALE;
+      magnitude *= Modifiers.getNewsMult() * Sectors.getBossMult();
+      magnitude = Sectors.applyNewsMag(event.type, magnitude);
+      const duration = event.fedBoss ? 3000 : event.boss ? Utils.rand(3000, 5000) : event.miniBoss ? Utils.rand(1500, 2500) : Utils.rand(2000, 4000);
       let credibility = 'high', isFake = false;
+      let fakeChance = Math.min(Config.WAVE_FAKE_CAP, diff.fakeChance + (WaveState.current - 1) * Config.WAVE_FAKE_SCALE);
+      fakeChance *= Sectors.getFakeMult();
       const roll = Utils.rand(0, 1);
-      if (roll < diff.fakeChance) { isFake = true; credibility = 'fake'; }
-      else if (roll < diff.fakeChance + 0.2) credibility = 'medium';
+      if (roll < fakeChance) { isFake = true; credibility = 'fake'; }
+      else if (roll < fakeChance + 0.2) credibility = 'medium';
 
       if (event.type === 'sec_raid') {
+        SECRaid.start(game);
+        this.schedule(game);
+        return;
+      }
+      if (Heat.value > 70 && Utils.rand(0, 1) < 0.06 * (Heat.getSecMult() - 1)) {
         SECRaid.start(game);
         this.schedule(game);
         return;
@@ -787,7 +1164,8 @@
         Market.newsShield = false;
         UI.setNews(`🛡️ ${event.headline} (BLOCKED)`, credibility, event.type, isFake);
         AudioEngine.play('news');
-        if (!event.boss) QTE.start(game, event.type, isFake, false);
+        if (!event.boss && !event.miniBoss) QTE.start(game, event.type, isFake, false);
+        else QTE.start(game, event.type, isFake, true, event.miniBoss, event.fedBoss);
         this.setNextPreview();
         this.schedule(game);
         return;
@@ -801,7 +1179,6 @@
       };
       Market.activeNews = newsItem;
       RunStats.newsSurvived++;
-      if (event.boss) QTE.start(game, event.type, isFake, true);
 
       UI.setNews(event.headline, credibility, event.type, isFake);
       AudioEngine.play('news');
@@ -819,7 +1196,8 @@
         RunStats.crashesHeldThrough++;
         if (RunStats.crashesHeldThrough >= 3) Achievements.unlock('diamond_hands', Meta.data);
       }
-      if (event.boss) RunStats.bossSurvived = true;
+      if (event.boss || event.miniBoss) RunStats.bossSurvived = true;
+      WaveState.bossTelegraph = null;
 
       if (isFake) {
         if (Meta.has('tinfoil_hat')) UI.showSuspiciousStamp();
@@ -829,14 +1207,18 @@
           const wrongCall = Meta.has('insider_friend') && Utils.rand(0, 1) < 0.5;
           if (!wrongCall) {
             UI.revealFakeNews();
-            if (Portfolio.value() > newsItem.startPortfolio) Achievements.unlock('fake_out', Meta.data);
+            if (Portfolio.value() > newsItem.startPortfolio) {
+              Achievements.unlock('fake_out', Meta.data);
+              Heat.onFakeProfit();
+            }
           } else {
             UI.showFakeWrongCall();
           }
         }, delay);
       }
 
-      if (!event.boss) QTE.start(game, event.type, isFake, false);
+      if (!event.boss && !event.miniBoss) QTE.start(game, event.type, isFake, false);
+      else QTE.start(game, event.type, isFake, true, event.miniBoss, event.fedBoss);
       this.setNextPreview();
       this.schedule(game);
     },
@@ -874,11 +1256,13 @@
       if (!this.active) return;
       if (survived) {
         RunStats.secSurvived = true;
+        Heat.onSecSurvive();
         Achievements.unlock('sec_survivor', Meta.data);
         this.end(true);
       } else {
         let fine = Portfolio.value() * 0.05;
         if (Meta.has('lawyer')) fine *= 0.5;
+        fine *= Heat.getFineMult();
         Portfolio.cash = Math.max(0, Portfolio.cash - fine);
         UI.spawnFloatText(document.getElementById('news-banner'), `-${Utils.formatMoney(fine)} SEC FINE`, false);
         this.end(false);
@@ -906,7 +1290,7 @@
   const QTE = {
     active: false, resolved: false,
     animFrame: null, game: null,
-    isBoss: false, isFake: false,
+    isBoss: false, isFake: false, isMiniBoss: false, isFedBoss: false,
     newsType: null, effectiveType: null,
     startTime: 0, duration: 2000,
 
@@ -924,7 +1308,9 @@
     getLabel() {
       const bullish = Utils.isBullish(this.effectiveType);
       const fakeHint = this.isFake ? ' · ?FAKE' : '';
+      if (this.isFedBoss) return `👹 THE FED — 3s window — TRADE NOW`;
       if (this.isBoss) return `👹 BOSS${fakeHint} — ${bullish ? '🚀 MOON' : '💀 CRASH'} — TRADE NOW`;
+      if (this.isMiniBoss) return `⚡ MINI-BOSS${fakeHint} — react fast!`;
       return bullish ? `🚀 MOON${fakeHint} — position now!` : `⚡ CRASH${fakeHint} — react fast!`;
     },
 
@@ -938,7 +1324,7 @@
       return Utils.isBullish(this.effectiveType) ? 'reacting-bullish' : 'reacting-bearish';
     },
 
-    start(game, newsType, isFake, isBoss) {
+    start(game, newsType, isFake, isBoss, isMiniBoss, isFedBoss) {
       if (this.active) this.cancel();
       this.game = game;
       this.active = true;
@@ -946,8 +1332,13 @@
       this.newsType = newsType;
       this.isFake = !!isFake;
       this.isBoss = !!isBoss;
+      this.isMiniBoss = !!isMiniBoss;
+      this.isFedBoss = !!isFedBoss;
       this.effectiveType = this.getEffectiveType(newsType, isFake);
-      this.duration = isBoss ? 1500 : Meta.getQteDuration();
+      if (this.isFedBoss) this.duration = 3000;
+      else if (this.isMiniBoss) this.duration = 1200;
+      else if (this.isBoss) this.duration = 1500;
+      else this.duration = Meta.getQteDuration();
       this.startTime = performance.now();
       UI.showReactionBar(this.getLabel(), this.getBarClass(), this.getGridClass());
       this.tick();
@@ -978,11 +1369,12 @@
       this.active = false;
       cancelAnimationFrame(this.animFrame);
 
-      const mult = (WaveState.qteBoost ? 2 : 1) * (this.isBoss ? 1.5 : 1) * Combo.mult();
+      const mult = (WaveState.qteBoost ? 2 : 1) * (this.isBoss || this.isFedBoss ? 1.5 : 1) * (this.isMiniBoss ? 1.25 : 1) * Combo.mult() * Modifiers.getReactionMult();
 
       if (smart) {
         Combo.onWin();
         RunStats.qteWins++;
+        RunStats.reactionWins++;
         WaveState.waveQTEWins++;
         const bonus = Math.min(Portfolio.value() * 0.02, Math.max(30, Portfolio.cash * 0.03)) * mult;
         Portfolio.cash += bonus;
@@ -1038,14 +1430,21 @@
       return frac;
     },
     getBuySpend() {
+      return this.getMaxBuySpend();
+    },
+    getMaxBuySpend() {
       const frac = this.getTradeFraction();
-      if (frac <= 1) return Portfolio.cash * frac;
-      return Portfolio.cash * Math.min(frac, Config.TRADE_SIZE_YOLO);
+      const minCash = (WaveState.current >= 3 && Meta.has('yolo_gene') && frac >= Config.TRADE_SIZE_YOLO)
+        ? Portfolio.startCash * Config.MARGIN_DEBT_LIMIT : 0;
+      if (frac <= 1) return Math.max(0, Portfolio.cash - minCash) * frac;
+      const spendable = Portfolio.cash - minCash;
+      return spendable > 0 ? spendable : Math.abs(minCash) * 0.5;
     },
     afterTrade(type) {
       QTE.onTrade(type);
       UI.updatePortfolio();
       UI.updateTradeButtons();
+      UI.updateFeesDisplay();
     },
     log(type, detail, pnl) {
       this.tradeLog.unshift({ type, detail, pnl, time: Utils.formatTime() });
@@ -1062,80 +1461,93 @@
       Portfolio.cash = snap.cash; Portfolio.shares = snap.shares;
       Portfolio.shortShares = snap.shortShares; Portfolio.shortAvgPrice = snap.shortAvgPrice;
     },
-    buy() {
-      const spend = this.getBuySpend();
-      if (spend <= 0) return;
+    execute(type) {
+      if (type === 'short' && Modifiers.shortsBanned()) return false;
       const frac = this.getTradeFraction();
+      const pv = Math.max(Portfolio.value(), 1);
       const snap = this.snapshot();
-      const bought = spend / Market.price;
-      Portfolio.cash -= spend;
-      Portfolio.shares += bought;
-      this.lastTrade = { type: 'buy', snap };
-      RunStats.tradesMade++; WaveState.waveTrades++;
-      if (frac >= 1) RunStats.fullSizeTrades++;
-      if (frac >= 1.2) Achievements.unlock('margin_monster', Meta.data);
-      AudioEngine.play('buy'); UI.animateButton('buy-btn');
-      UI.spawnFloatText(document.getElementById('buy-btn').parentElement, `+${Utils.formatShares(bought)}`, true);
-      this.log('buy', `BUY ${Utils.formatShares(bought)} @ ${Utils.formatMoney(Market.price)}`);
+      let notional = 0;
+      let qty = 0;
+      let pnl = null;
+      let detail = '';
+
+      if (type === 'buy') {
+        const spend = this.getMaxBuySpend();
+        if (spend <= 0) return false;
+        notional = spend;
+        qty = spend / Market.price;
+      } else if (type === 'sell') {
+        qty = Portfolio.shares * Math.min(frac, 1);
+        if (qty <= 0) return false;
+        notional = qty * Market.price;
+      } else if (type === 'short') {
+        const max = Portfolio.maxShortShares(Meta.has('dark_pool'));
+        qty = max * Math.min(frac, 1);
+        if (qty <= 0) return false;
+        notional = qty * Market.price;
+      } else if (type === 'cover') {
+        qty = Portfolio.shortShares * Math.min(frac, 1);
+        if (qty <= 0) return false;
+        notional = qty * Market.price;
+      } else return false;
+
+      const fee = Fees.calcTradeCost(notional, notional / pv);
+
+      if (type === 'buy') {
+        Portfolio.cash -= notional + fee;
+        Portfolio.shares += qty;
+        if (frac >= 1) RunStats.fullSizeTrades++;
+        if (frac >= 1.2) Achievements.unlock('margin_monster', Meta.data);
+        detail = `BUY ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)} (−${Utils.formatMoney(fee)} fees)`;
+        AudioEngine.play('buy'); UI.animateButton('buy-btn');
+        UI.spawnFloatText(document.getElementById('buy-btn').parentElement, `+${Utils.formatShares(qty)}`, true);
+        if (notional >= 5000) Achievements.unlock('whale', Meta.data);
+      } else if (type === 'sell') {
+        Portfolio.shares -= qty;
+        Portfolio.cash += notional - fee;
+        pnl = notional - fee;
+        if (frac >= 1) RunStats.fullSizeTrades++;
+        if (Market.activeNews && Utils.isBullish(Market.activeNews.type)) {
+          WaveState.soldDuringMoon = true;
+          Achievements.unlock('paper_hands', Meta.data);
+        }
+        detail = `SELL ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)} (−${Utils.formatMoney(fee)} fees)`;
+        AudioEngine.play('sell'); UI.animateButton('sell-btn');
+        UI.spawnFloatText(document.getElementById('sell-btn').parentElement, Utils.formatMoney(pnl), pnl > 0);
+      } else if (type === 'short') {
+        const total = Portfolio.shortShares + qty;
+        Portfolio.shortAvgPrice = Portfolio.shortShares > 0
+          ? (Portfolio.shortAvgPrice * Portfolio.shortShares + Market.price * qty) / total : Market.price;
+        Portfolio.shortShares = total;
+        Portfolio.cash += notional - fee;
+        detail = `SHORT ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)} (−${Utils.formatMoney(fee)} fees)`;
+        AudioEngine.play('short'); UI.animateButton('short-btn');
+      } else if (type === 'cover') {
+        pnl = (Portfolio.shortAvgPrice - Market.price) * qty - fee;
+        Portfolio.cash -= notional + fee;
+        Portfolio.shortShares -= qty;
+        if (Portfolio.shortShares <= 0) { Portfolio.shortShares = 0; Portfolio.shortAvgPrice = 0; }
+        if (pnl > 0) { WaveState.waveShortProfit = true; Achievements.unlock('short_king', Meta.data); }
+        detail = `COVER ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)} (−${Utils.formatMoney(fee)} fees)`;
+        AudioEngine.play('cover'); UI.animateButton('cover-btn');
+      }
+
+      Fees.recordTrade(fee);
+      Heat.onTrade(notional / pv);
+      this.lastTrade = { type, snap };
+      RunStats.tradesMade++;
+      WaveState.waveTrades++;
       Achievements.unlock('first_trade', Meta.data);
       if (RunStats.fullSizeTrades >= 5) Achievements.unlock('all_in', Meta.data);
-      if (spend >= 5000) Achievements.unlock('whale', Meta.data);
       if (Portfolio.shares > 0 && Portfolio.shortShares > 0) Achievements.unlock('hedge_lord', Meta.data);
-      this.afterTrade('buy');
+      this.log(type, detail, pnl);
+      this.afterTrade(type);
+      return true;
     },
-    sell() {
-      const frac = this.getTradeFraction();
-      const qty = Portfolio.shares * Math.min(frac, 1);
-      if (qty <= 0) return;
-      const snap = this.snapshot();
-      const proceeds = qty * Market.price;
-      Portfolio.shares -= qty; Portfolio.cash += proceeds;
-      this.lastTrade = { type: 'sell', snap };
-      RunStats.tradesMade++; WaveState.waveTrades++;
-      if (frac >= 1) RunStats.fullSizeTrades++;
-      if (Market.activeNews && Utils.isBullish(Market.activeNews.type)) {
-        WaveState.soldDuringMoon = true;
-        Achievements.unlock('paper_hands', Meta.data);
-      }
-      AudioEngine.play('sell'); UI.animateButton('sell-btn');
-      UI.spawnFloatText(document.getElementById('sell-btn').parentElement, Utils.formatMoney(proceeds), true);
-      this.log('sell', `SELL ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)}`, proceeds);
-      this.afterTrade('sell');
-    },
-    short() {
-      const frac = this.getTradeFraction();
-      const max = Portfolio.maxShortShares(Meta.has('dark_pool'));
-      const qty = max * Math.min(frac, 1);
-      if (qty <= 0) return;
-      const snap = this.snapshot();
-      const proceeds = qty * Market.price;
-      const total = Portfolio.shortShares + qty;
-      Portfolio.shortAvgPrice = Portfolio.shortShares > 0
-        ? (Portfolio.shortAvgPrice * Portfolio.shortShares + Market.price * qty) / total : Market.price;
-      Portfolio.shortShares = total; Portfolio.cash += proceeds;
-      this.lastTrade = { type: 'short', snap };
-      RunStats.tradesMade++; WaveState.waveTrades++;
-      AudioEngine.play('short'); UI.animateButton('short-btn');
-      this.log('short', `SHORT ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)}`);
-      Achievements.unlock('first_trade', Meta.data);
-      this.afterTrade('short');
-    },
-    cover() {
-      const frac = this.getTradeFraction();
-      const qty = Portfolio.shortShares * Math.min(frac, 1);
-      if (qty <= 0) return;
-      const snap = this.snapshot();
-      const pnl = (Portfolio.shortAvgPrice - Market.price) * qty;
-      Portfolio.cash -= qty * Market.price;
-      Portfolio.shortShares -= qty;
-      if (Portfolio.shortShares <= 0) { Portfolio.shortShares = 0; Portfolio.shortAvgPrice = 0; }
-      this.lastTrade = { type: 'cover', snap };
-      RunStats.tradesMade++; WaveState.waveTrades++;
-      if (pnl > 0) { WaveState.waveShortProfit = true; Achievements.unlock('short_king', Meta.data); }
-      AudioEngine.play('cover'); UI.animateButton('cover-btn');
-      this.log('cover', `COVER ${Utils.formatShares(qty)} @ ${Utils.formatMoney(Market.price)}`, pnl);
-      this.afterTrade('cover');
-    },
+    buy() { return this.execute('buy'); },
+    sell() { return this.execute('sell'); },
+    short() { return this.execute('short'); },
+    cover() { return this.execute('cover'); },
     undo() {
       if (!Meta.has('ghost_portfolio') || this.undoUsed || !this.lastTrade) return;
       this.restore(this.lastTrade.snap);
@@ -1175,6 +1587,8 @@
         'retire-bonus','trade-status-hint','debug-overlay',
         'regime-badge','combo-badge','session-pnl','inter-wave-rank',
         'reaction-bar','reaction-label','reaction-timer-fill','reaction-feedback',
+        'sector-badge','heat-bar-fill','fees-total','modifier-pills','churning-hint',
+        'ascend-btn','modifier-draft','endless-toggle','daily-modifier-card',
       ].forEach((id) => { this.els[id] = document.getElementById(id); });
     },
     show(id) { this.els[id]?.classList.remove('hidden'); },
@@ -1213,6 +1627,10 @@
       }
       this.updateSessionPnl();
       this.updateRegime();
+      this.updateSectorBadge();
+      this.updateHeatBar();
+      this.updateFeesDisplay();
+      this.updateModifierPills();
       this.updateCombo();
       this.updateTradeButtons();
     },
@@ -1313,8 +1731,68 @@
       const el = this.els['regime-badge'];
       if (!el) return;
       const r = Market.getRegime();
-      el.textContent = r.label;
+      let label = r.label;
+      if (Meta.has('sector_insider')) label += ` · ${Sectors.getBiasLabel().split(':')[0]}`;
+      el.textContent = label;
       el.className = `badge badge-regime regime-${Market.regime}`;
+    },
+    updateSectorBadge() {
+      const el = this.els['sector-badge'];
+      if (!el) return;
+      const s = Sectors.get();
+      el.textContent = s.label;
+      el.className = `badge badge-sector sector-${s.id}`;
+    },
+    updateHeatBar() {
+      const el = this.els['heat-bar-fill'];
+      if (!el) return;
+      el.style.width = `${Heat.value}%`;
+      el.className = `heat-bar-fill ${Heat.value > 70 ? 'heat-hot' : Heat.value > 40 ? 'heat-warm' : ''}`;
+    },
+    updateFeesDisplay() {
+      const el = this.els['fees-total'];
+      if (el) el.textContent = Utils.formatMoney(Fees.sessionTotal);
+    },
+    updateModifierPills() {
+      const el = this.els['modifier-pills'];
+      if (!el) return;
+      const mods = Modifiers.active;
+      if (!mods.length) { el.innerHTML = ''; el.classList.add('hidden'); return; }
+      el.classList.remove('hidden');
+      el.innerHTML = mods.map((m) => `<span class="modifier-pill">${m.icon || '✦'} ${m.label}</span>`).join('');
+    },
+    showChurningHint(show) {
+      const el = this.els['churning-hint'];
+      if (!el) return;
+      el.textContent = show ? '⚠️ CHURNING — fees spiking' : '';
+      el.classList.toggle('hidden', !show);
+    },
+    renderModifierDraft(options, onPick) {
+      const el = this.els['modifier-draft'];
+      if (!el) return;
+      el.classList.remove('hidden');
+      el.innerHTML = `<p class="text-xs font-mono text-purple-400 uppercase mb-2">Pick a Run Modifier</p>
+        <div class="modifier-draft-grid">${options.map((m) =>
+          `<button type="button" class="modifier-draft-card" data-mod="${m.id}">
+            <span class="text-lg">${m.icon || '✦'}</span>
+            <span class="font-bold text-sm">${m.label}</span>
+            <span class="text-xs text-gray-400">${m.desc}</span>
+          </button>`
+        ).join('')}</div>`;
+      el.querySelectorAll('[data-mod]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const mod = options.find((m) => m.id === btn.dataset.mod);
+          if (mod) onPick(mod);
+          el.classList.add('hidden');
+        }, { once: true });
+      });
+    },
+    hideModifierDraft() { this.els['modifier-draft']?.classList.add('hidden'); },
+    showAscendChoice(show) {
+      const btn = this.els['ascend-btn'];
+      if (btn) btn.classList.toggle('hidden', !show);
+      const keep = document.getElementById('keep-trading-btn');
+      if (keep && show) keep.textContent = 'CASH OUT 💰';
     },
     updateCombo() {
       const el = this.els['combo-badge'];
@@ -1370,8 +1848,14 @@
       b.className = `badge ${diff.badgeClass}`;
     },
     updateWaveUI() {
-      this.els['wave-badge'].textContent = `DAY ${WaveState.current}/${Config.TOTAL_WAVES}`;
-      this.els['wave-goal-text'].textContent = `🎯 ${WaveState.goal?.label || 'Survive'}`;
+      if (EndlessMode.active) {
+        this.els['wave-badge'].textContent = `∞ ${Math.floor(EndlessMode.elapsed / 1000)}s`;
+      } else if (NGPlus.active) {
+        this.els['wave-badge'].textContent = `DAY ${WaveState.current}/${NGPlus.getTotalWaves()}${NGPlus.ascended ? ' ★' : ''}`;
+      } else {
+        this.els['wave-badge'].textContent = `DAY ${WaveState.current}/${Config.TOTAL_WAVES}`;
+      }
+      this.els['wave-goal-text'].textContent = EndlessMode.active ? '🎯 Survive endless chaos' : `🎯 ${WaveState.goal?.label || 'Survive'}`;
     },
     updateWaveTimer(remaining, total) {
       const pct = Math.max(0, remaining / total);
@@ -1440,14 +1924,14 @@
         <button data-shop="${item.id}" ${Meta.data.chaosPoints < item.cost ? 'disabled' : ''}>${item.cost} CP</button></div>`
       ).join('');
     },
-    showIntermission(goalMet) {
+    showIntermission(goalMet, showAscend) {
       const rank = WaveState.calcWaveRank(goalMet);
       this.els['inter-wave-rank'].textContent = `RANK: ${rank}`;
       this.els['inter-wave-rank'].className = `text-center font-display text-2xl font-black mb-2 rank-${rank.toLowerCase()}`;
       this.els['inter-wave-num'].textContent = WaveState.current;
       this.els['inter-goal-result'].textContent = goalMet
         ? '✅ Wave goal completed! +20 CP bonus incoming'
-        : '❌ Wave goal missed — small penalty applied';
+        : `❌ Wave goal missed — ${(Config.GOAL_MISS_PENALTY * 100).toFixed(0)}% penalty applied`;
       this.els['inter-goal-result'].className = `text-center font-mono text-sm mb-6 ${goalMet ? 'text-emerald-400' : 'text-red-400'}`;
       this.els['inter-portfolio'].textContent = Utils.formatMoney(Portfolio.value());
       this.els['inter-peak'].textContent = Utils.formatMoney(RunStats.peakPortfolio);
@@ -1456,6 +1940,9 @@
       const nextGoal = WaveState.buildGoalPreview(Portfolio.value());
       this.els['inter-next-goal'].textContent = nextGoal.label;
       this.renderWaveShop();
+      this.showAscendChoice(!!showAscend);
+      const keepBtn = document.getElementById('keep-trading-btn');
+      if (keepBtn) keepBtn.textContent = showAscend ? 'ASCEND →' : 'KEEP TRADING →';
       this.show('intermission-overlay');
       UI.updateTradeButtons();
     },
@@ -1474,6 +1961,16 @@
       this.els['score-chaos-earned'].textContent = pts;
       this.els['score-streak-bonus'].textContent = Meta.data.winStreak > 0 ? `Streak bonus: ${Meta.data.winStreak}x` : '';
       this.show('score-overlay');
+    },
+    renderDailyCard() {
+      const el = this.els['daily-modifier-card'];
+      if (!el) return;
+      const today = new Date().toDateString();
+      RNG.setSeed(Utils.dailySeed());
+      const mod = Config.MODIFIER_POOL[Utils.randInt(0, Config.MODIFIER_POOL.length - 1)];
+      const sector = Object.keys(Config.SECTORS)[Utils.randInt(0, 2)];
+      RNG.reset();
+      el.innerHTML = `<span class="text-xs text-gray-500">Today's Daily:</span> <span class="text-yellow-400">${mod.label}</span> · <span class="text-cyan-400">${Config.SECTORS[sector].label}</span>`;
     },
     showRetireToast(amount, bonus) {
       this.showAchievementToast(
@@ -1527,12 +2024,23 @@
       UI.els['setting-particles'].checked = Meta.data.settings.particles;
       UI.els['mute-btn'].textContent = Meta.data.settings.sound ? '🔊' : '🔇';
       UI.els['daily-seed-toggle'].checked = Meta.data.dailySeed;
+      const endlessToggle = UI.els['endless-toggle'];
+      if (endlessToggle) {
+        endlessToggle.checked = Meta.data.endlessMode;
+        endlessToggle.disabled = !EndlessMode.isUnlocked(Meta.data);
+      }
+      UI.renderDailyCard();
       this.difficulty = Meta.data.selectedDifficulty || 'normal';
       this.highlightDifficulty(this.difficulty);
       UI.els['menu-chaos-points'].textContent = Meta.data.chaosPoints;
       UI.els['menu-streak'].textContent = Meta.data.winStreak;
       UI.els['menu-best-streak'].textContent = Meta.data.bestStreak;
       UI.renderOwnedPreview();
+      UI.renderDailyCard();
+      const sector = Meta.data.selectedSector || 'meme';
+      document.querySelectorAll('[data-sector]').forEach((b) => {
+        b.classList.toggle('active', b.dataset.sector === sector);
+      });
       UI.updateTradeChips();
       this.bindEvents();
       window.addEventListener('resize', () => this.onResize());
@@ -1558,6 +2066,21 @@
       });
       UI.els['daily-seed-toggle'].addEventListener('change', (e) => {
         Meta.data.dailySeed = e.target.checked; Storage.save(Meta.data);
+      });
+      UI.els['endless-toggle']?.addEventListener('change', (e) => {
+        if (!EndlessMode.isUnlocked(Meta.data)) { e.target.checked = false; return; }
+        Meta.data.endlessMode = e.target.checked;
+        if (e.target.checked) Meta.data.dailySeed = false;
+        Storage.save(Meta.data);
+        UI.els['daily-seed-toggle'].checked = Meta.data.dailySeed;
+      });
+      document.querySelectorAll('[data-sector]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-sector]').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          Meta.data.selectedSector = btn.dataset.sector;
+          Storage.save(Meta.data);
+        });
       });
       document.getElementById('upgrades-list').addEventListener('click', (e) => {
         const id = e.target.dataset?.upgrade;
@@ -1605,7 +2128,11 @@
         UI.updateTradeChips();
       });
       // QTE buttons removed — reaction now via buy/sell/short/cover
-      document.getElementById('keep-trading-btn').addEventListener('click', () => this.continueRun());
+      document.getElementById('keep-trading-btn').addEventListener('click', () => {
+        if (WaveState.pendingAscend) this.ascendRun();
+        else this.continueRun();
+      });
+      document.getElementById('ascend-btn')?.addEventListener('click', () => this.ascendRun());
       document.getElementById('cash-out-btn').addEventListener('click', () => this.cashOut());
       document.getElementById('wave-shop-items').addEventListener('click', (e) => {
         const id = e.target.dataset?.shop;
@@ -1671,23 +2198,48 @@
       this.difficulty = Meta.data.selectedDifficulty || 'normal';
       Market.difficulty = this.difficulty;
 
-      if (Meta.data.dailySeed) {
+      const isEndless = Meta.data.endlessMode && EndlessMode.isUnlocked(Meta.data);
+      const isDaily = Meta.data.dailySeed && !isEndless;
+      EndlessMode.reset();
+      NGPlus.reset();
+      Modifiers.reset();
+      Fees.reset();
+      Heat.reset();
+
+      if (isDaily) {
         RNG.setSeed(Utils.dailySeed());
         RunStats.dailyRun = true;
+        const dayKey = new Date().toDateString();
+        if (Meta.data.dailyLastPlayed !== dayKey) Meta.data.dailyLastPlayed = dayKey;
       } else { RNG.reset(); RunStats.dailyRun = false; }
+
+      Sectors.pick(Meta.data.selectedSector || 'meme');
+      if (isEndless) EndlessMode.start();
 
       const startCash = Meta.getStartCash();
       Portfolio.reset(startCash);
       Market.reset();
       RunStats.reset(startCash);
+      RunStats.sector = Sectors.get().id;
       Trading.reset();
       Sparkline.reset(startCash);
       Combo.reset();
       NewsGenerator.recent = [];
-      WaveState.current = 1;
+      WaveState.current = (Meta.has('ascension_key') && Meta.data.ascensionKeyStart && !isEndless) ? 6 : 1;
+      if (WaveState.current >= 6) { NGPlus.start(); RunStats.ngPlusRun = true; }
       WaveState.intermission = false;
+      WaveState.pendingAscend = false;
+      WaveState.modifierDraftShown = false;
       WaveState.qteBoost = false;
       WaveState.retiredMilestones = new Set();
+
+      if (isDaily) {
+        RNG.setSeed(Utils.dailySeed());
+        const mod = Config.MODIFIER_POOL[Utils.randInt(0, Config.MODIFIER_POOL.length - 1)];
+        Modifiers.apply(mod);
+        Sectors.pick(Object.keys(Config.SECTORS)[Utils.randInt(0, 2)]);
+        RNG.reset();
+      }
 
       News.clear(); QTE.cancel();
       UI.hide('main-menu'); UI.hide('score-overlay');
@@ -1698,6 +2250,10 @@
 
       UI.setDifficultyBadge(this.difficulty);
       UI.setNews('Markets open. Brace for chaos...', 'high', 'neutral', false);
+      if (this.difficulty === 'nightmare' && WaveState.current === 2) {
+        Market.price *= 0.88;
+        UI.setNews('NIGHTMARE: Mini-crash at open!', 'high', 'crash', false);
+      }
       this.startWave();
       this.initCharts();
       News.setNextPreview();
@@ -1710,15 +2266,22 @@
 
     startWave() {
       WaveState.intermission = false;
-      WaveState.duration = WaveState.getDuration();
+      WaveState.duration = EndlessMode.active ? 999999999 : WaveState.getDuration();
       WaveState.startTime = performance.now();
       WaveState.resetWaveStats();
+      Fees.resetWave();
       Market.setWaveAnchor();
-      WaveState.pickGoal();
-      RunStats.goalsTotal++;
+      if (!EndlessMode.active) {
+        WaveState.pickGoal();
+        RunStats.goalsTotal++;
+      }
+      if (this.difficulty === 'nightmare' && WaveState.current === 2) {
+        Market.price *= 0.92;
+      }
       UI.updateWaveUI();
       UI.updateTradeButtons();
       UI.hide('intermission-overlay');
+      UI.hideModifierDraft();
       AudioEngine.play('wave');
     },
 
@@ -1749,7 +2312,7 @@
     },
 
     checkWaveEnd() {
-      if (WaveState.intermission || this.gameOver) return;
+      if (WaveState.intermission || this.gameOver || EndlessMode.active) return;
       const elapsed = performance.now() - WaveState.startTime;
       if (elapsed < WaveState.duration) return;
       this.completeWave();
@@ -1765,24 +2328,65 @@
         const bonus = 20 + (Meta.has('influencer_collab') ? 1 : 0);
         Meta.data.chaosPoints += bonus;
         Storage.save(Meta.data);
+        if (WaveState.goal?.id === 'no_overtrade') Achievements.unlock('no_churn_wave', Meta.data);
       } else {
         RunStats.flawless = false;
-        Portfolio.cash = Math.max(0, Portfolio.cash - Portfolio.value() * 0.01);
+        Portfolio.cash = Math.max(0, Portfolio.cash - Portfolio.value() * Config.GOAL_MISS_PENALTY);
       }
+      if (Fees.waveTotal <= 5) Achievements.unlock('zero_fee_wave', Meta.data);
+      if (Portfolio.cash >= 0 && WaveState.current >= 5) Achievements.unlock('debt_free', Meta.data);
       RunStats.wavesCleared = WaveState.current;
       if (Meta.has('compound_interest')) {
-        const bonus = Portfolio.value() * 0.02;
-        Portfolio.cash += bonus;
+        Portfolio.cash += Portfolio.value() * 0.02;
       }
-      if (WaveState.current >= Config.TOTAL_WAVES) {
+
+      const isFinalBaseWave = WaveState.current >= Config.TOTAL_WAVES && !NGPlus.active;
+      const isFinalNGWave = NGPlus.active && WaveState.current >= Config.NG_PLUS_MAX_WAVE;
+
+      if (isFinalNGWave) {
+        Meta.data.ngPlusClears++;
+        Achievements.unlock('ng_plus_clear', Meta.data);
+        if (!Meta.data.sectorsCleared) Meta.data.sectorsCleared = {};
+        Meta.data.sectorsCleared[RunStats.sector] = true;
+        if (Object.keys(Meta.data.sectorsCleared).length >= 3) Achievements.unlock('sector_master', Meta.data);
+        if (Modifiers.active.length >= 2) Achievements.unlock('modifier_stack', Meta.data);
+        Storage.save(Meta.data);
         this.endRun('victory');
         return;
       }
-      UI.showIntermission(WaveState.goalMet);
+      if (isFinalBaseWave) {
+        WaveState.pendingAscend = true;
+        UI.showIntermission(WaveState.goalMet, true);
+        return;
+      }
+      this.showIntermissionWithDraft(WaveState.goalMet);
+    },
+
+    showIntermissionWithDraft(goalMet) {
+      UI.showIntermission(goalMet, false);
+      const shouldDraft = (WaveState.current === 1 || NGPlus.active) && Modifiers.active.length < Modifiers.maxStack;
+      if (shouldDraft && !WaveState.modifierDraftShown) {
+        WaveState.modifierDraftShown = true;
+        const options = Modifiers.draftOptions();
+        UI.renderModifierDraft(options, (mod) => {
+          Modifiers.apply(mod);
+          UI.updateModifierPills();
+        });
+      }
+    },
+
+    ascendRun() {
+      NGPlus.start();
+      RunStats.ngPlusRun = true;
+      WaveState.pendingAscend = false;
+      WaveState.current = Config.TOTAL_WAVES + 1;
+      WaveState.modifierDraftShown = false;
+      this.continueRun();
     },
 
     continueRun() {
       WaveState.current++;
+      WaveState.pendingAscend = false;
       this.startWave();
       UI.updateTradeButtons();
       News.setNextPreview();
@@ -1860,7 +2464,11 @@
         Portfolio.shortAvgPrice = 0;
         UI.spawnFloatText(document.getElementById('margin-overlay'), 'COVERED', true);
       } else if (!covered) {
-        this.endRun('bankrupt');
+        if (EndlessMode.active && EndlessMode.recordMarginCall()) {
+          this.endRun('bankrupt');
+        } else if (!EndlessMode.active) {
+          this.endRun('bankrupt');
+        }
       }
     },
 
@@ -1907,6 +2515,11 @@
         AudioEngine.play('victory');
         Achievements.unlock('wave_warrior', Meta.data);
         Meta.data.winStreak++;
+        if (RunStats.ngPlusRun) Achievements.unlock('ng_plus_clear', Meta.data);
+      }
+      if (EndlessMode.active) {
+        EndlessMode.checkBest(Meta.data, RunStats.peakPortfolio);
+        if (EndlessMode.elapsed >= 300000) Achievements.unlock('endless_survivor', Meta.data);
       }
       if (RunStats.flawless && RunStats.goalsCompleted === RunStats.goalsTotal && RunStats.goalsTotal >= 5) {
         Achievements.unlock('five_wave_flawless', Meta.data);
@@ -1943,13 +2556,22 @@
         RunStats.updatePeak();
         WaveState.trackPeak();
         Sparkline.push(Portfolio.value());
+        Fees.applyBorrowCost(dt);
+        Fees.applyMarginDebt(dt);
+        Heat.decay(dt);
+        EndlessMode.update(dt);
+        if (EndlessMode.active) EndlessMode.checkBest(Meta.data, Portfolio.value());
         this.checkAchievements();
         this.checkRetirePrompt();
         this.checkMarginCall();
         this.checkBankruptcy();
-        this.checkWaveEnd();
-        const remaining = WaveState.duration - (performance.now() - WaveState.startTime);
-        UI.updateWaveTimer(remaining, WaveState.duration);
+        if (!EndlessMode.active) this.checkWaveEnd();
+        if (EndlessMode.active) {
+          UI.updateWaveUI();
+        } else {
+          const remaining = WaveState.duration - (performance.now() - WaveState.startTime);
+          UI.updateWaveTimer(remaining, WaveState.duration);
+        }
       }
 
       Chart.draw(Market.price);

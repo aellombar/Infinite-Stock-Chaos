@@ -1097,3 +1097,118 @@ details[open] summary::before { transform: rotate(90deg); }
 
 /* ── Buff indicator ── */
 .buff-active { outline: 2px solid #a78bfa; outline-offset: 2px; }
+
+/* ── v3: Heat bar, sector, modifiers ── */
+.heat-bar-track {
+  height: 4px;
+  background: #1f2937;
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+.heat-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #34d399, #fbbf24, #ef4444);
+  transition: width 0.2s ease;
+}
+
+.heat-bar-fill.heat-warm { background: linear-gradient(90deg, #fbbf24, #f97316); }
+.heat-bar-fill.heat-hot { background: linear-gradient(90deg, #f97316, #ef4444); animation: heat-pulse 1s infinite; }
+
+@keyframes heat-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.badge-sector {
+  font-size: 8px;
+  padding: 2px 5px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+}
+
+.sector-meme { background: rgba(236, 72, 153, 0.2); border-color: rgba(236, 72, 153, 0.4); color: #f9a8d4; }
+.sector-bluechip { background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd; }
+.sector-biotech { background: rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.4); color: #d8b4fe; }
+
+.modifier-pills {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 2px 0;
+  flex-shrink: 0;
+}
+
+.modifier-pill {
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.25);
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  color: #c4b5fd;
+  white-space: nowrap;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.churning-hint {
+  font-size: 9px;
+  font-family: 'Roboto Mono', monospace;
+  color: #fbbf24;
+  text-align: center;
+  padding: 1px 0;
+  flex-shrink: 0;
+}
+
+.sector-select-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.sector-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #374151;
+  background: rgba(17, 24, 39, 0.8);
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.sector-card.active {
+  border-color: #34d399;
+  background: rgba(6, 78, 59, 0.15);
+}
+
+.sector-card-title { font-weight: 700; font-size: 13px; }
+.sector-card-desc { font-size: 11px; color: #6b7280; }
+
+.modifier-draft-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.modifier-draft-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #4c1d95;
+  background: rgba(76, 29, 149, 0.2);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.modifier-draft-card:hover {
+  border-color: #a78bfa;
+  background: rgba(76, 29, 149, 0.35);
+}

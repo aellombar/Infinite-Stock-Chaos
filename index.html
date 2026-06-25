@@ -50,7 +50,27 @@
       <p class="font-mono text-sm text-yellow-400 mb-2">Chaos Points: <span id="menu-chaos-points">0</span></p>
       <p class="font-mono text-xs text-gray-500 mb-6">Win Streak: <span id="menu-streak">0</span> · Best: <span id="menu-best-streak">0</span></p>
 
-      <div id="owned-upgrades-preview" class="flex flex-wrap justify-center gap-1 mb-6 min-h-[24px]"></div>
+      <div id="owned-upgrades-preview" class="flex flex-wrap justify-center gap-1 mb-4 min-h-[24px]"></div>
+
+      <div class="mb-4 text-left">
+        <p class="text-xs font-mono text-gray-500 uppercase tracking-wider mb-2">Sector</p>
+        <div class="sector-select-grid" id="sector-select">
+          <button type="button" data-sector="meme" class="sector-card active">
+            <span class="sector-card-title">Meme Stock</span>
+            <span class="sector-card-desc">More moon, more fake, higher vol</span>
+          </button>
+          <button type="button" data-sector="bluechip" class="sector-card">
+            <span class="sector-card-title">Blue Chip</span>
+            <span class="sector-card-desc">Slower, lower fees, weaker swings</span>
+          </button>
+          <button type="button" data-sector="biotech" class="sector-card">
+            <span class="sector-card-title">Biotech</span>
+            <span class="sector-card-desc">Binary crashes/moons, boss events 2×</span>
+          </button>
+        </div>
+      </div>
+
+      <p id="daily-modifier-card" class="text-xs font-mono text-center mb-3 min-h-[18px]"></p>
 
       <div class="mb-4 text-left">
         <p class="text-xs font-mono text-gray-500 uppercase tracking-wider mb-2">Difficulty</p>
@@ -70,9 +90,14 @@
         </div>
       </div>
 
-      <label class="setting-row mb-4 cursor-pointer">
+      <label class="setting-row mb-2 cursor-pointer">
         <span class="text-sm">Daily Chaos (fixed seed)</span>
         <input type="checkbox" id="daily-seed-toggle" class="setting-toggle" />
+      </label>
+
+      <label class="setting-row mb-4 cursor-pointer">
+        <span class="text-sm">Endless Chaos <span class="text-gray-600 text-xs">(unlock: NG+ or 500 CP)</span></span>
+        <input type="checkbox" id="endless-toggle" class="setting-toggle" />
       </label>
 
       <button id="start-game-btn" class="btn-primary w-full py-4 mb-3 font-black text-lg rounded-xl">START RUN</button>
@@ -106,7 +131,10 @@
         <div id="wave-shop-items" class="space-y-2"></div>
       </div>
 
+      <div id="modifier-draft" class="mb-4 hidden"></div>
+
       <button id="keep-trading-btn" class="btn-primary w-full py-4 mb-2 font-black rounded-xl">KEEP TRADING →</button>
+      <button id="ascend-btn" class="btn-primary w-full py-4 mb-2 font-black rounded-xl hidden bg-purple-700 hover:bg-purple-600 border border-purple-400/40">ASCEND → NG+</button>
       <button id="cash-out-btn" class="w-full py-4 font-black rounded-xl bg-cyan-700 hover:bg-cyan-600 border border-cyan-400/40 shadow-[0_0_20px_rgba(34,211,238,0.2)]">CASH OUT 💰</button>
     </div>
   </div>
@@ -208,6 +236,7 @@
     <header class="game-topbar">
       <div class="game-topbar-left">
         <span id="wave-badge" class="badge badge-wave">DAY 1/5</span>
+        <span id="sector-badge" class="badge badge-sector">MEME</span>
         <span id="regime-badge" class="badge badge-regime">CHOP</span>
         <span id="difficulty-badge" class="badge badge-normal">NORMAL</span>
         <div class="wave-timer-inline">
@@ -239,6 +268,7 @@
         </div>
       </div>
       <p id="wave-goal-text" class="wave-goal-pill">🎯 Survive the chaos</p>
+      <div id="modifier-pills" class="modifier-pills hidden"></div>
     </div>
 
     <!-- Compact stats strip -->
@@ -246,7 +276,10 @@
       <div class="stat-cell"><span class="stat-label">Cash</span><span id="liquid-cash" class="stat-value text-cyan-400">$1,000</span></div>
       <div class="stat-cell"><span class="stat-label">Long</span><span id="total-shares" class="stat-value text-purple-400">0</span></div>
       <div class="stat-cell"><span class="stat-label">Short</span><span id="short-shares" class="stat-value text-orange-400">0</span><span id="short-pnl" class="stat-sub"></span></div>
+      <div class="stat-cell"><span class="stat-label">Fees</span><span id="fees-total" class="stat-value text-red-400">$0</span></div>
     </div>
+    <div class="heat-bar-track"><div id="heat-bar-fill" class="heat-bar-fill"></div></div>
+    <p id="churning-hint" class="churning-hint hidden" aria-live="polite"></p>
 
     <!-- Main scroll-free flex area: news + chart -->
     <div class="game-main">
