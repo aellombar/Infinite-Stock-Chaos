@@ -787,7 +787,7 @@
         Market.newsShield = false;
         UI.setNews(`🛡️ ${event.headline} (BLOCKED)`, credibility, event.type, isFake);
         AudioEngine.play('news');
-        if (!event.boss) QTE.start(game, event.type, isFake);
+        if (!event.boss) QTE.start(game, event.type, isFake, false, false);
         this.setNextPreview();
         this.schedule(game);
         return;
@@ -801,7 +801,7 @@
       };
       Market.activeNews = newsItem;
       RunStats.newsSurvived++;
-      if (event.boss) QTE.start(game, event.type, false, true);
+      if (event.boss) QTE.start(game, event.type, isFake, true, false);
 
       UI.setNews(event.headline, credibility, event.type, isFake);
       AudioEngine.play('news');
@@ -836,7 +836,7 @@
         }, delay);
       }
 
-      if (!event.boss) QTE.start(game, event.type, isFake);
+      if (!event.boss) QTE.start(game, event.type, isFake, false, false);
       this.setNextPreview();
       this.schedule(game);
     },
@@ -894,16 +894,76 @@
 
   const QTE = {
     active: false, startTime: 0, duration: 2000, newsType: null, resolved: false,
-    animFrame: null, game: null, isBoss: false, isSec: false,
+    animFrame: null, game: null, isBoss: false, isSec: false, isFake: false, expected: 'hodl',
+
+    // Matrix (effectiveType = real price impact, not headline):
+    // | effectiveType | expected | prompt                 |
+    // | bearish       | panic    | PANIC SELL?            |
+    // | bullish       | hodl     | DIAMOND HANDS?         |
+    // | boss+bearish  | panic    | BOSS — PANIC SELL?     |
+    // | boss+bullish  | hodl     | BOSS — DIAMOND HANDS?  |
+    // | fake news     | invert(displayType) for scoring  |
+    // | SEC raid      | panic    | COMPLY (yes) / LIE (no)|
+
+    getEffectiveType(newsType, isFake) {
+      return isFake ? Utils.invertType(newsType) : newsType;
+    },
+
+    getExpectedAction(newsType, isFake, isBoss, isSec) {
+      if (isSec) return 'panic';
+      const eff = this.getEffectiveType(newsType, isFake);
+      if (Utils.isBearish(eff)) return 'panic';
+      return 'hodl';
+    },
+
+    getPrompt(newsType, isFake, isBoss, isSec) {
+      if (isSec) return 'SEC RAID — COMPLY OR LIE?';
+      const eff = this.getEffectiveType(newsType, isFake);
+      const suffix = isFake ? ' · Headline may be fake' : '';
+      if (isBoss) {
+        return Utils.isBearish(eff)
+          ? `BOSS FIGHT — PANIC SELL?${suffix}`
+          : `BOSS FIGHT — DIAMOND HANDS?${suffix}`;
+      }
+      return Utils.isBearish(eff) ? `PANIC SELL?${suffix}` : `DIAMOND HANDS?${suffix}`;
+    },
+
+    choiceLabel(panic, isSec) {
+      if (isSec) return panic ? 'COMPLY' : 'LIE';
+      return panic ? 'PANIC' : 'HODL';
+    },
+
+    expectedLabel(expected, isSec) {
+      if (isSec) return expected === 'panic' ? 'COMPLY' : 'LIE';
+      return expected === 'panic' ? 'PANIC' : 'HODL';
+    },
+
+    isChoiceCorrect(panic, expected) {
+      return expected === 'panic' ? panic === true : panic === false;
+    },
+
+    resultFeedback(panic, correct, expected, isSec, moneyText) {
+      const want = this.expectedLabel(expected, isSec);
+      if (correct) return moneyText ? `CORRECT — ${want} (${moneyText})` : `CORRECT — ${want}`;
+      if (isSec) return `WRONG — you chose ${this.choiceLabel(panic, isSec)} (needed ${want})`;
+      return panic ? `WRONG — you PANIC'd (needed ${want})` : `WRONG — you HODL'd (needed ${want})`;
+    },
+
     start(game, newsType, isFake, isBoss, isSec) {
-      this.game = game; this.active = true; this.resolved = false;
-      this.newsType = newsType; this.isBoss = !!isBoss; this.isSec = !!isSec;
+      this.game = game;
+      this.active = true;
+      this.resolved = false;
+      this.newsType = newsType;
+      this.isFake = !!isFake;
+      this.isBoss = !!isBoss;
+      this.isSec = !!isSec;
+      this.expected = this.getExpectedAction(newsType, isFake, isBoss, isSec);
       this.duration = isBoss ? 2500 : Meta.getQteDuration();
       this.startTime = performance.now();
-      const bearish = Utils.isBearish(newsType) || isSec;
-      UI.showQTE(isBoss ? 'BOSS FIGHT — PANIC?' : bearish ? 'PANIC SELL?' : 'DIAMOND HANDS?', this.duration);
+      UI.showQTE(this.getPrompt(newsType, isFake, isBoss, isSec), { isSec });
       this.tick();
     },
+
     tick() {
       if (!this.active || this.resolved) return;
       const elapsed = performance.now() - this.startTime;
@@ -911,48 +971,56 @@
       if (elapsed >= this.duration) { this.resolve(null); return; }
       this.animFrame = requestAnimationFrame(() => this.tick());
     },
+
     respond(panic) {
       if (!this.active || this.resolved) return;
       if (navigator.vibrate) navigator.vibrate(12);
       this.resolve(panic);
     },
+
     resolve(panic) {
       if (this.resolved) return;
-      this.resolved = true; this.active = false;
+      this.resolved = true;
+      this.active = false;
       cancelAnimationFrame(this.animFrame);
-      if (this.isSec) {
-        UI.hideQTE();
-        SECRaid.resolve(panic === true);
-        return;
-      }
+
       if (panic === null) {
-        if (!this.isBoss) Combo.onBreak();
+        if (!this.isBoss && !this.isSec) Combo.onBreak();
         UI.showQTEFeedback('TOO LATE', 'late');
         setTimeout(() => UI.hideQTE(), 450);
         UI.updateCombo();
+        if (this.isSec) SECRaid.resolve(false);
         return;
       }
 
-      const bearish = Utils.isBearish(this.newsType);
-      const correct = bearish ? panic : !panic;
+      const correct = this.isChoiceCorrect(panic, this.expected);
+
+      if (this.isSec) {
+        UI.showQTEFeedback(this.resultFeedback(panic, correct, this.expected, true), correct ? 'win' : 'lose');
+        setTimeout(() => {
+          UI.hideQTE();
+          SECRaid.resolve(correct);
+        }, correct ? 350 : 500);
+        return;
+      }
+
       const mult = (WaveState.qteBoost ? 2 : 1) * (this.isBoss ? 1.5 : 1) * Combo.mult();
 
       if (correct) {
         Combo.onWin();
-        RunStats.qteWins++; WaveState.waveQTEWins++;
+        RunStats.qteWins++;
+        WaveState.waveQTEWins++;
         const bonus = Math.min(Portfolio.value() * 0.02, Math.max(30, Portfolio.cash * 0.03)) * mult;
         Portfolio.cash += bonus;
         AudioEngine.play('qte_win');
-        UI.showQTEFeedback(`+${Utils.formatMoney(bonus)}`, 'win');
-        UI.spawnFloatText(document.getElementById('qte-overlay'), `+${Utils.formatMoney(bonus)}`, true);
+        UI.showQTEFeedback(this.resultFeedback(panic, true, this.expected, false, `+${Utils.formatMoney(bonus)}`), 'win');
         if (RunStats.qteWins >= 5) Achievements.unlock('quick_fingers', Meta.data);
       } else {
         Combo.onBreak();
         const penalty = Math.min(Portfolio.cash, Portfolio.value() * 0.02);
         Portfolio.cash = Math.max(0, Portfolio.cash - penalty);
         AudioEngine.play('qte_lose');
-        UI.showQTEFeedback(`-${Utils.formatMoney(penalty)}`, 'lose');
-        UI.spawnFloatText(document.getElementById('qte-overlay'), `-${Utils.formatMoney(penalty)}`, false);
+        UI.showQTEFeedback(this.resultFeedback(panic, false, this.expected, false), 'lose');
       }
       UI.updateCombo();
       UI.updatePortfolio();
@@ -1108,7 +1176,7 @@
         'upgrades-owned-count','upgrades-total-count','achievements-unlocked-count',
         'achievements-total-count','sec-countdown','margin-timer-bar','retire-milestone-text',
         'retire-bonus','trade-status-hint','debug-overlay',
-        'regime-badge','combo-badge','session-pnl','qte-feedback','qte-backdrop','inter-wave-rank',
+        'regime-badge','combo-badge','session-pnl','qte-feedback','qte-backdrop','inter-wave-rank','qte-hint',
       ].forEach((id) => { this.els[id] = document.getElementById(id); });
     },
     show(id) { this.els[id]?.classList.remove('hidden'); },
@@ -1217,10 +1285,22 @@
       el.classList.remove('hidden');
     },
     hideNextNewsHint() { this.els['next-news-hint']?.classList.add('hidden'); },
-    showQTE(prompt) {
+    showQTE(prompt, opts = {}) {
       this.els['qte-prompt'].textContent = prompt;
       this.els['qte-timer-bar'].style.width = '100%';
       this.els['qte-feedback']?.classList.add('hidden');
+      const yesLabel = document.querySelector('#qte-yes .qte-btn-label');
+      const noLabel = document.querySelector('#qte-no .qte-btn-label');
+      const hint = this.els['qte-hint'];
+      if (opts.isSec) {
+        if (yesLabel) yesLabel.textContent = 'COMPLY';
+        if (noLabel) noLabel.textContent = 'LIE';
+        if (hint) hint.textContent = 'Space / tap left = COMPLY · N / → / tap right = LIE';
+      } else {
+        if (yesLabel) yesLabel.textContent = 'PANIC';
+        if (noLabel) noLabel.textContent = 'HODL';
+        if (hint) hint.textContent = 'Space / tap left = PANIC · N / → / tap right = HODL';
+      }
       this.show('qte-overlay');
       document.body.classList.add('qte-active');
       requestAnimationFrame(() => document.getElementById('qte-yes')?.focus());
@@ -1420,8 +1500,8 @@
     handleKeydown(e) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (QTE.active && !QTE.resolved) {
-        const panicKeys = ['y', 'Y', ' ', 'ArrowLeft', 'a', 'A'];
-        const hodlKeys = ['n', 'N', 'Shift', 'ArrowRight', 'd', 'D'];
+        const panicKeys = [' ', 'ArrowLeft', 'a', 'A', 'y', 'Y'];
+        const hodlKeys = ['ArrowRight', 'n', 'N', 'd', 'D'];
         if (panicKeys.includes(e.key)) { e.preventDefault(); QTE.respond(true); return; }
         if (hodlKeys.includes(e.key)) { e.preventDefault(); QTE.respond(false); return; }
         return;
